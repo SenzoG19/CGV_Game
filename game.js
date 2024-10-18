@@ -31,7 +31,7 @@ function initPhysics() {
     world.gravity.set(0, -9.82, 0); // Gravity pointing downwards
 
     // Sphere physics body
-    const sphereShape = new CANNON.Sphere(4);
+    const sphereShape = new CANNON.Sphere(1);
     sphereBody = new CANNON.Body({
         mass: 5,
         position: new CANNON.Vec3(0, 10, 0), // Center above the ground
@@ -59,7 +59,7 @@ function loadSoccerBall() {
     const loader = new GLTFLoader();
     loader.load(
         // Path to your 3D model file (relative or absolute URL)
-        './Simple_soccer_ball.glb', 
+        './Simple_soccer_football.glb', 
         (gltf) => {
             // Called when the resource is loaded
             const model = gltf.scene;
@@ -106,7 +106,7 @@ function initScene() {
     canvasContainer.appendChild(renderer.domElement);
 
     // Sphere setup
-    const sphereGeometry = new THREE.SphereGeometry(4, 50, 50);
+    const sphereGeometry = new THREE.SphereGeometry(1, 50, 50);
     const sphereMaterial = new THREE.MeshStandardMaterial({
         color: 'cyan',
         wireframe: false
