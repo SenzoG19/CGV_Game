@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 
 // Global variables
-let scene, camera, renderer, sphere, sphereBody, world, spotLight;
+let scene, camera, renderer, sphere, sphereBody, soccerBall, soccerBallBody, world, spotLight;
 let yaw = 0, pitch = 0;
 let cameraMode = 'third-person'; // Initialize in third-person mode
 const keys = {
@@ -20,7 +20,7 @@ const keys = {
     v: false
 };
 let mouseDown = false;
-
+    
 // Mouse sensitivity settings
 const mouseSensitivity = 0.002;
 const pitchLimit = Math.PI / 3;
@@ -30,7 +30,7 @@ function initPhysics() {
     world = new CANNON.World();
     world.gravity.set(0, -9.82, 0); // Gravity pointing downwards
 
-    // Sphere physics body
+    // Sphere physics body (Original Ball)
     const sphereShape = new CANNON.Sphere(1);
     sphereBody = new CANNON.Body({
         mass: 5,
@@ -39,10 +39,19 @@ function initPhysics() {
         material: new CANNON.Material({ restitution: 0.5 }) // Bounce effect
     });
 
-    // Apply linear damping to simulate friction
     sphereBody.linearDamping = 0.5;
-
     world.addBody(sphereBody);
+
+    // Soccer ball physics body
+    soccerBallBody = new CANNON.Body({
+        mass: 5,
+        position: new CANNON.Vec3(5, 10, 0), // Position it near the original ball
+        shape: sphereShape,
+        material: new CANNON.Material({ restitution: 0.5 }) // Same bounce effect
+    });
+
+    soccerBallBody.linearDamping = 0.5;
+    world.addBody(soccerBallBody);
 
     // Plane physics body
     const planeShape = new CANNON.Plane();
@@ -58,27 +67,24 @@ function initPhysics() {
 function loadSoccerBall() {
     const loader = new GLTFLoader();
     loader.load(
-        // Path to your 3D model file (relative or absolute URL)
-        './Simple_soccer_football.glb', 
+        './soccer_ball.glb',
         (gltf) => {
-            // Called when the resource is loaded
-            const model = gltf.scene;
-            model.castShadow = true;
-            model.receiveShadow = true;
+            soccerBall = gltf.scene;
+            soccerBall.castShadow = true;
+            soccerBall.receiveShadow = true;
 
-            // Position, scale, and rotation settings for the model
-            model.position.set(0, 0, 0);
-            model.scale.set(1, 1, 1); // Adjust scale if needed
+            // Set initial position based on physics body
+            soccerBall.position.copy(soccerBallBody.position);
+            soccerBall.scale.set(1, 1, 1); // Adjust if necessary
 
-            // Add the model to the scene
-            scene.add(model);
+            scene.add(soccerBall);
+            // Focus the camera on the soccer ball after it loads
+            camera.lookAt(soccerBall.position);
         },
         (xhr) => {
-            // Called while loading is progressing
             console.log((xhr.loaded / xhr.total * 100) + '% loaded');
         },
         (error) => {
-            // Called if an error occurs
             console.error('An error occurred loading the model', error);
         }
     );
@@ -98,14 +104,15 @@ function initScene() {
     loadSoccerBall();
 
     const canvasContainer = document.getElementById('canvasContainer');
-    renderer = new THREE.WebGLRenderer();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Better shadow quality
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio); // Ensure high DPI devices are handled
     renderer.setClearColor(0x000000);
     canvasContainer.appendChild(renderer.domElement);
 
-    // Sphere setup
+    // Sphere setup (Original Ball)
     const sphereGeometry = new THREE.SphereGeometry(1, 50, 50);
     const sphereMaterial = new THREE.MeshStandardMaterial({
         color: 'cyan',
@@ -143,16 +150,96 @@ function initScene() {
     const sLightHelper = new THREE.SpotLightHelper(spotLight);
     scene.add(sLightHelper);
 
-
     const gridHelper = new THREE.GridHelper(100, 100);
     scene.add(gridHelper);
 
     const axesHelper = new THREE.AxesHelper(10);
     scene.add(axesHelper);
 
-    // Camera initial position
+    // Camera initial position and target
     camera.position.set(0, 20, 50);
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(new THREE.Vector3(0, 0, 0)); // Ensure it's looking at the center initially
+}
+
+
+// Animate function that updates the scene and physics
+function animate() {
+    world.step(1 / 60);
+
+    // Update original ball position
+    sphere.position.copy(sphereBody.position);
+    sphere.quaternion.copy(sphereBody.quaternion);
+
+    // Update soccer ball position and rotation based on physics
+    if (soccerBall) {
+        soccerBall.position.copy(soccerBallBody.position);
+        soccerBall.quaternion.copy(soccerBallBody.quaternion);
+    }
+
+    // Calculate movement based on keys pressed
+    updateMovement();
+
+    // Update the camera position and direction
+    updateCamera();
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+
+// Update movement logic for the soccer ball
+function updateMovement() {
+    const moveForward = keys.ArrowUp || keys.w;
+    const moveBackward = keys.ArrowDown || keys.s;
+    const moveLeft = keys.ArrowLeft || keys.a;
+    const moveRight = keys.ArrowRight || keys.d;
+
+    const forwardVector = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+    const rightVector = new THREE.Vector3().crossVectors(forwardVector, new THREE.Vector3(0, 1, 0)).normalize();
+
+    if (moveForward) {
+        soccerBallBody.velocity.x += forwardVector.x * 20 * (1 / 60);
+        soccerBallBody.velocity.z += forwardVector.z * 20 * (1 / 60);
+    }
+    if (moveBackward) {
+        soccerBallBody.velocity.x -= forwardVector.x * 20 * (1 / 60);
+        soccerBallBody.velocity.z -= forwardVector.z * 20 * (1 / 60);
+    }
+    if (moveLeft) {
+        soccerBallBody.velocity.x -= rightVector.x * 20 * (1 / 60);
+        soccerBallBody.velocity.z -= rightVector.z * 20 * (1 / 60);
+    }
+    if (moveRight) {
+        soccerBallBody.velocity.x += rightVector.x * 20 * (1 / 60);
+        soccerBallBody.velocity.z += rightVector.z * 20 * (1 / 60);
+    }
+
+    const isOnGround = Math.abs(soccerBallBody.position.y - 1) < 0.1 && soccerBallBody.velocity.y <= 0.01;
+    if (keys[' '] && isOnGround) {
+        soccerBallBody.velocity.y = 10;
+    }
+}
+
+// Update camera to follow the soccer ball
+function updateCamera() {
+    if (cameraMode === 'third-person') {
+        const cameraDistance = 30;
+        const cameraX = soccerBallBody.position.x + cameraDistance * Math.sin(yaw) * Math.cos(pitch);
+        const cameraY = soccerBallBody.position.y + cameraDistance * Math.sin(pitch);
+        const cameraZ = soccerBallBody.position.z + cameraDistance * Math.cos(yaw) * Math.cos(pitch);
+        camera.position.set(cameraX, cameraY, cameraZ);
+    } else if (cameraMode === 'first-person') {
+        const cameraX = soccerBallBody.position.x + 5 * Math.sin(yaw);
+        const cameraY = soccerBallBody.position.y + 6;
+        const cameraZ = soccerBallBody.position.z + 5 * Math.cos(yaw);
+        camera.position.set(cameraX, cameraY, cameraZ);
+    }
+
+    if (soccerBall) {
+        camera.lookAt(soccerBall.position);
+    } else {
+        camera.lookAt(new THREE.Vector3(0, 0, 0)); // Default to center if soccerBall isn't loaded yet
+    }
 }
 
 // Setup event listeners for keyboard and mouse controls
@@ -180,98 +267,9 @@ function setupControls() {
             yaw -= event.movementX * mouseSensitivity;
             pitch -= event.movementY * mouseSensitivity;
 
-            // Clamp pitch to prevent flipping
             pitch = Math.max(-pitchLimit, Math.min(pitchLimit, pitch));
         }
     });
-}
-
-// Toggle between first-person and third-person camera modes
-function toggleCameraMode() {
-    if (cameraMode === 'third-person') {
-        cameraMode = 'first-person';
-    } else {
-        cameraMode = 'third-person';
-    }
-}
-
-// Animate function that updates the scene and physics
-function animate() {
-    world.step(1 / 60);
-
-    // Update sphere position based on physics
-    sphere.position.copy(sphereBody.position);
-    sphere.quaternion.copy(sphereBody.quaternion);
-
-    // Calculate movement based on keys pressed
-    updateMovement();
-
-    // Update the camera position and direction
-    updateCamera();
-
-    renderer.render(scene, camera);
-    requestAnimationFrame(animate);
-}
-
-// Update movement logic for the sphere
-function updateMovement() {
-    const moveForward = keys.ArrowUp || keys.w;
-    const moveBackward = keys.ArrowDown || keys.s;
-    const moveLeft = keys.ArrowLeft || keys.a;
-    const moveRight = keys.ArrowRight || keys.d;
-
-    // Get the forward direction based on the camera orientation
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-    cameraDirection.y = 0; // Ignore the y-component for horizontal movement
-    cameraDirection.normalize();
-
-    // The right vector is perpendicular to the forward direction
-    const rightVector = new THREE.Vector3().crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0)).normalize();
-
-    // Apply velocity based on input
-    if (moveForward) {
-        sphereBody.velocity.x += cameraDirection.x * 20 * (1 / 60);
-        sphereBody.velocity.z += cameraDirection.z * 20 * (1 / 60);
-    }
-    if (moveBackward) {
-        sphereBody.velocity.x -= cameraDirection.x * 20 * (1 / 60);
-        sphereBody.velocity.z -= cameraDirection.z * 20 * (1 / 60);
-    }
-    if (moveLeft) {
-        sphereBody.velocity.x -= rightVector.x * 20 * (1 / 60);
-        sphereBody.velocity.z -= rightVector.z * 20 * (1 / 60);
-    }
-    if (moveRight) {
-        sphereBody.velocity.x += rightVector.x * 20 * (1 / 60);
-        sphereBody.velocity.z += rightVector.z * 20 * (1 / 60);
-    }
-
-    // Jump action
-    const isOnGround = Math.abs(sphereBody.position.y - 4) < 0.1 && sphereBody.velocity.y <= 0.01;
-    if (keys[' '] && isOnGround) {
-        sphereBody.velocity.y = 25;
-    }
-}
-
-
-// Update camera to follow the sphere based on the current mode
-function updateCamera() {
-    if (cameraMode === 'third-person') {
-        const cameraDistance = 30;
-        const cameraX = sphere.position.x + cameraDistance * Math.sin(yaw) * Math.cos(pitch);
-        const cameraY = sphere.position.y + cameraDistance * Math.sin(pitch);
-        const cameraZ = sphere.position.z + cameraDistance * Math.cos(yaw) * Math.cos(pitch);
-        camera.position.set(cameraX, cameraY, cameraZ);
-    } else if (cameraMode === 'first-person') {
-        // Position camera slightly above and behind the sphere for a first-person view
-        const cameraX = sphere.position.x + 5 * Math.sin(yaw);
-        const cameraY = sphere.position.y + 6;
-        const cameraZ = sphere.position.z + 5 * Math.cos(yaw);
-        camera.position.set(cameraX, cameraY, cameraZ);
-    }
-
-    camera.lookAt(sphere.position);
 }
 
 // Event listener for the start button
