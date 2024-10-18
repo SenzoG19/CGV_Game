@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import * as CANNON from 'cannon-es';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 
 // Global variables
 let scene, camera, renderer, sphere, sphereBody, world, spotLight;
@@ -52,6 +54,37 @@ function initPhysics() {
     world.addBody(planeBody);
 }
 
+
+function loadSoccerBall() {
+    const loader = new GLTFLoader();
+    loader.load(
+        // Path to your 3D model file (relative or absolute URL)
+        './Simple_soccer_ball.glb', 
+        (gltf) => {
+            // Called when the resource is loaded
+            const model = gltf.scene;
+            model.castShadow = true;
+            model.receiveShadow = true;
+
+            // Position, scale, and rotation settings for the model
+            model.position.set(0, 0, 0);
+            model.scale.set(1, 1, 1); // Adjust scale if needed
+
+            // Add the model to the scene
+            scene.add(model);
+        },
+        (xhr) => {
+            // Called while loading is progressing
+            console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+        },
+        (error) => {
+            // Called if an error occurs
+            console.error('An error occurred loading the model', error);
+        }
+    );
+}
+
+
 // Initialize Three.js scene
 function initScene() {
     scene = new THREE.Scene();
@@ -61,6 +94,8 @@ function initScene() {
         0.1,
         1000
     );
+
+    loadSoccerBall();
 
     const canvasContainer = document.getElementById('canvasContainer');
     renderer = new THREE.WebGLRenderer();
@@ -215,7 +250,7 @@ function updateMovement() {
     // Jump action
     const isOnGround = Math.abs(sphereBody.position.y - 4) < 0.1 && sphereBody.velocity.y <= 0.01;
     if (keys[' '] && isOnGround) {
-        sphereBody.velocity.y = 10;
+        sphereBody.velocity.y = 25;
     }
 }
 
