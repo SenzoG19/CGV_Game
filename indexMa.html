@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Game with Menu</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #111;
+        }
+
+        #menu {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1;
+            position: absolute;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        #canvasContainer {
+            display: none; /* Hide the game initially */
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <!-- <div id="menu">
+        <h1>Main Menu</h1>
+        <button id="startButton">Start Game</button>
+        <button id="levelButton">Select Level</button>
+        <button id="optionsButton">Options</button>
+        <button id="quitButton">Quit</button>
+    </div> -->
+
+    <!-- The container for your Three.js game -->
+    <div id="canvasContainer"></div>
+
+    <script type="module" src="scripts/game.js"></script>
+</body>
+</html>

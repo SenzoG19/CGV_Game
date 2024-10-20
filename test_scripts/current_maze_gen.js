@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import * as CANNON from 'cannon-es';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
+import { MazeWorld } from './world_maze.js';
 
 // Global variables
-let scene, camera, renderer, sphere, sphereBody, soccerBall, soccerBallBody, world, spotLight;
+let mazeWorld, scene, camera, renderer, soccerBall, soccerBallBody, spotLight;
 let yaw = 0, pitch = 0;
-let cameraMode = 'third-person'; // Initialize in third-person mode
+let cameraMode = 'third-person';
 const keys = {
     ArrowUp: false,
     ArrowDown: false,
@@ -20,65 +20,56 @@ const keys = {
     v: false
 };
 let mouseDown = false;
-    
-// Mouse sensitivity settings
+
 const mouseSensitivity = 0.002;
 const pitchLimit = Math.PI / 3;
 
-// Initialize physics world and setup
+function initGame() {
+    initPhysics();
+    initScene();
+    setupControls();
+    animate();
+}
+
 function initPhysics() {
-    world = new CANNON.World();
-    world.gravity.set(0, -9.82, 0); // Gravity pointing downwards
+    mazeWorld = new MazeWorld();
 
-    // Sphere physics body (Original Ball)
-    const sphereShape = new CANNON.Sphere(1);
-    sphereBody = new CANNON.Body({
-        mass: 5,
-        position: new CANNON.Vec3(0, 10, 0), // Center above the ground
-        shape: sphereShape,
-        material: new CANNON.Material({ restitution: 0.5 }) // Bounce effect
-    });
+    const wallsData = [
+        { x: 0, z: 10, length: 20, height: 5, isAlignedWithZ: false },
+        { x: -10, z: 0, length: 20, height: 7, isAlignedWithZ: true },
+        { x: 10, z: -5, length: 15, height: 6, isAlignedWithZ: false },
+        // Add more walls as needed
+    ];
 
-    sphereBody.linearDamping = 0.5;
-    world.addBody(sphereBody);
+    mazeWorld.createMaze(wallsData);
 
-    // Soccer ball physics body
+    scene = mazeWorld.scene;
+
+    const sphereShape = new CANNON.Sphere(0.5);
     soccerBallBody = new CANNON.Body({
         mass: 5,
-        position: new CANNON.Vec3(5, 10, 0), // Position it near the original ball
+        position: mazeWorld.getStartPosition(),
         shape: sphereShape,
-        material: new CANNON.Material({ restitution: 0.5 }) // Same bounce effect
+        material: new CANNON.Material({ restitution: 0.5 })
     });
 
     soccerBallBody.linearDamping = 0.5;
-    world.addBody(soccerBallBody);
-
-    // Plane physics body
-    const planeShape = new CANNON.Plane();
-    const planeBody = new CANNON.Body({
-        mass: 0, // Static object
-        shape: planeShape
-    });
-    planeBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-    world.addBody(planeBody);
+    mazeWorld.addBody(soccerBallBody);
 }
-
 
 function loadSoccerBall() {
     const loader = new GLTFLoader();
     loader.load(
-        './soccer_ball.glb',
+        './models/soccer_ball.glb',
         (gltf) => {
             soccerBall = gltf.scene;
             soccerBall.castShadow = true;
             soccerBall.receiveShadow = true;
 
-            // Set initial position based on physics body
             soccerBall.position.copy(soccerBallBody.position);
-            soccerBall.scale.set(1, 1, 1); // Adjust if necessary
+            soccerBall.scale.set(0.5, 0.5, 0.5);
 
-            scene.add(soccerBall);
-            // Focus the camera on the soccer ball after it loads
+            mazeWorld.addToScene(soccerBall);
             camera.lookAt(soccerBall.position);
         },
         (xhr) => {
@@ -90,52 +81,27 @@ function loadSoccerBall() {
     );
 }
 
-
-// Initialize Three.js scene
 function initScene() {
-    scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(
-        45,
+        75,
         window.innerWidth / window.innerHeight,
         0.1,
         1000
     );
 
-    loadSoccerBall();
-
     const canvasContainer = document.getElementById('canvasContainer');
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Better shadow quality
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio); // Ensure high DPI devices are handled
-    renderer.setClearColor(0x000000);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x87CEEB);
     canvasContainer.appendChild(renderer.domElement);
 
-    // Sphere setup (Original Ball)
-    const sphereGeometry = new THREE.SphereGeometry(1, 50, 50);
-    const sphereMaterial = new THREE.MeshStandardMaterial({
-        color: 'cyan',
-        wireframe: false
-    });
-    sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    scene.add(sphere);
-    sphere.castShadow = true;
+    loadSoccerBall();
 
-    // Plane setup
-    const planeGeometry = new THREE.PlaneGeometry(100, 100);
-    const planeMaterial = new THREE.MeshStandardMaterial({
-        color: 'orange',
-        side: THREE.DoubleSide
-    });
-    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-    scene.add(plane);
-    plane.rotation.x = -0.5 * Math.PI;
-    plane.receiveShadow = true;
-
-    // Lighting setup
-    const ambientLight = new THREE.AmbientLight(0x333333);
-    scene.add(ambientLight);
+    const ambientLight = new THREE.AmbientLight(0xffffff);
+    mazeWorld.addToScene(ambientLight);
 
     spotLight = new THREE.SpotLight(0xffffff, 1);
     spotLight.position.set(-30, 60, 60);
@@ -143,51 +109,29 @@ function initScene() {
     spotLight.penumbra = 0.5;
     spotLight.decay = 2;
     spotLight.distance = 200;
-    spotLight.intensity = 50000;
+    spotLight.intensity = 2;
     spotLight.castShadow = true;
-    scene.add(spotLight);
+    mazeWorld.addToScene(spotLight);
 
-    const sLightHelper = new THREE.SpotLightHelper(spotLight);
-    scene.add(sLightHelper);
-
-    const gridHelper = new THREE.GridHelper(100, 100);
-    scene.add(gridHelper);
-
-    const axesHelper = new THREE.AxesHelper(10);
-    scene.add(axesHelper);
-
-    // Camera initial position and target
-    camera.position.set(0, 20, 50);
-    camera.lookAt(new THREE.Vector3(0, 0, 0)); // Ensure it's looking at the center initially
+    camera.position.set(0, 30, 30);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
 }
 
-
-// Animate function that updates the scene and physics
 function animate() {
-    world.step(1 / 60);
+    requestAnimationFrame(animate);
+    mazeWorld.update();
 
-    // Update original ball position
-    sphere.position.copy(sphereBody.position);
-    sphere.quaternion.copy(sphereBody.quaternion);
-
-    // Update soccer ball position and rotation based on physics
     if (soccerBall) {
         soccerBall.position.copy(soccerBallBody.position);
         soccerBall.quaternion.copy(soccerBallBody.quaternion);
     }
 
-    // Calculate movement based on keys pressed
     updateMovement();
-
-    // Update the camera position and direction
     updateCamera();
 
     renderer.render(scene, camera);
-    requestAnimationFrame(animate);
 }
 
-
-// Update movement logic for the soccer ball
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
     const moveBackward = keys.ArrowDown || keys.s;
@@ -197,52 +141,51 @@ function updateMovement() {
     const forwardVector = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
     const rightVector = new THREE.Vector3().crossVectors(forwardVector, new THREE.Vector3(0, 1, 0)).normalize();
 
+    const force = 10;
     if (moveForward) {
-        soccerBallBody.velocity.x += forwardVector.x * 20 * (1 / 60);
-        soccerBallBody.velocity.z += forwardVector.z * 20 * (1 / 60);
+        soccerBallBody.applyForce(new CANNON.Vec3(-forwardVector.x * force, 0, -forwardVector.z * force), soccerBallBody.position);
     }
     if (moveBackward) {
-        soccerBallBody.velocity.x -= forwardVector.x * 20 * (1 / 60);
-        soccerBallBody.velocity.z -= forwardVector.z * 20 * (1 / 60);
+        soccerBallBody.applyForce(new CANNON.Vec3(forwardVector.x * force, 0, forwardVector.z * force), soccerBallBody.position);
     }
     if (moveLeft) {
-        soccerBallBody.velocity.x -= rightVector.x * 20 * (1 / 60);
-        soccerBallBody.velocity.z -= rightVector.z * 20 * (1 / 60);
+        soccerBallBody.applyForce(new CANNON.Vec3(rightVector.x * force, 0, rightVector.z * force), soccerBallBody.position);
     }
     if (moveRight) {
-        soccerBallBody.velocity.x += rightVector.x * 20 * (1 / 60);
-        soccerBallBody.velocity.z += rightVector.z * 20 * (1 / 60);
+        soccerBallBody.applyForce(new CANNON.Vec3(-rightVector.x * force, 0, -rightVector.z * force), soccerBallBody.position);
     }
 
-    const isOnGround = Math.abs(soccerBallBody.position.y - 1) < 0.1 && soccerBallBody.velocity.y <= 0.01;
+    const isOnGround = Math.abs(soccerBallBody.position.y - 0.5) < 0.1 && soccerBallBody.velocity.y <= 0.01;
     if (keys[' '] && isOnGround) {
-        soccerBallBody.velocity.y = 10;
+        soccerBallBody.velocity.y = 5;
     }
 }
 
-// Update camera to follow the soccer ball
 function updateCamera() {
     if (cameraMode === 'third-person') {
-        const cameraDistance = 30;
+        const cameraDistance = 15;
         const cameraX = soccerBallBody.position.x + cameraDistance * Math.sin(yaw) * Math.cos(pitch);
         const cameraY = soccerBallBody.position.y + cameraDistance * Math.sin(pitch);
         const cameraZ = soccerBallBody.position.z + cameraDistance * Math.cos(yaw) * Math.cos(pitch);
         camera.position.set(cameraX, cameraY, cameraZ);
     } else if (cameraMode === 'first-person') {
-        const cameraX = soccerBallBody.position.x + 5 * Math.sin(yaw);
-        const cameraY = soccerBallBody.position.y + 6;
-        const cameraZ = soccerBallBody.position.z + 5 * Math.cos(yaw);
+        const cameraX = soccerBallBody.position.x + 2 * Math.sin(yaw);
+        const cameraY = soccerBallBody.position.y + 3;
+        const cameraZ = soccerBallBody.position.z + 2 * Math.cos(yaw);
         camera.position.set(cameraX, cameraY, cameraZ);
     }
 
     if (soccerBall) {
         camera.lookAt(soccerBall.position);
     } else {
-        camera.lookAt(new THREE.Vector3(0, 0, 0)); // Default to center if soccerBall isn't loaded yet
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
     }
 }
 
-// Setup event listeners for keyboard and mouse controls
+function toggleCameraMode() {
+    cameraMode = cameraMode === 'third-person' ? 'first-person' : 'third-person';
+}
+
 function setupControls() {
     window.addEventListener('keydown', (event) => {
         if (keys.hasOwnProperty(event.key)) {
@@ -269,18 +212,14 @@ function setupControls() {
 
             pitch = Math.max(-pitchLimit, Math.min(pitchLimit, pitch));
         }
-    });
+    });a
 }
 
 // Event listener for the start button
 document.getElementById('startButton').addEventListener('click', () => {
     document.getElementById('menu').style.display = 'none';
     document.getElementById('canvasContainer').style.display = 'block';
-
-    initPhysics();
-    initScene();
-    setupControls();
-    animate();
+    initGame();
 });
 
 // Other menu options
