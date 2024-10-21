@@ -66,7 +66,7 @@ function initPhysics() {
 function createFloor() {
     const floorSize = 100;
     const floorMaterial = new THREE.MeshStandardMaterial({
-        color: "orange",
+        color: "cyan",
         side: THREE.DoubleSide,
         roughness: 0.8,
         metalness: 0.2
@@ -126,7 +126,6 @@ function createMaze(wallsData) {
 }
 
 function createSoccerBall() {
-    // Create Cannon.js physics body for the ball
     const sphereShape = new CANNON.Sphere(1);
     soccerBallBody = new CANNON.Body({
         mass: 1,
@@ -137,33 +136,26 @@ function createSoccerBall() {
     soccerBallBody.linearDamping = 0.5;
     physicsWorld.addBody(soccerBallBody);
 
-    // Create a Three.js material with emissive glow
     const geometry = new THREE.SphereGeometry(1, 32, 32);
     const material = new THREE.MeshStandardMaterial({
-        color: 0xff0000,   // Red color for the ball
-        emissive: 0xff0000, // Emissive glow in red
-        emissiveIntensity: 1.5, // Glow strength
+        color: 0xff0000,
+        emissive: 0xff0000,
+        emissiveIntensity: 1.5,
         roughness: 0.4,
         metalness: 0.2,
-        wireframe: false
+        wireframe: true
     });
 
-    // Create the soccer ball mesh
     soccerBall = new THREE.Mesh(geometry, material);
     soccerBall.castShadow = true;
     soccerBall.receiveShadow = true;
-    soccerBall.position.copy(soccerBallBody.position);
     scene.add(soccerBall);
 
-    // Create a point light attached to the soccer ball
-// Add this after creating the PointLight
-const ballLight = new THREE.PointLight(0xffffff, 100, 100);  // Light intensity 2, range 10
-soccerBall.add(ballLight);  // Attach the light to the soccer ball
+    const ballLight = new THREE.PointLight(0xffffff, 100, 100);
+    soccerBall.add(ballLight);
 
-// Create a light helper to visualize the light's range
-const lightHelper = new THREE.PointLightHelper(ballLight, 2); // Adjust size as needed
-scene.add(lightHelper);
-  // Attach the light to the ball
+    const lightHelper = new THREE.PointLightHelper(ballLight, 2);
+    scene.add(lightHelper);
 }
 
 
@@ -197,27 +189,43 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// Update movement logic for the soccer ball
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
     const moveBackward = keys.ArrowDown || keys.s;
     const moveLeft = keys.ArrowLeft || keys.a;
     const moveRight = keys.ArrowRight || keys.d;
 
-    const force = 10;
-    const forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const acceleration = 20 * (1 / 60); // Acceleration per frame
+    const maxSpeed = 10; // Maximum speed
 
+    // Apply forces based on key presses
     if (moveForward) {
-        soccerBallBody.applyForce(new CANNON.Vec3(forwardVector.x * force, 0, forwardVector.z * force), soccerBallBody.position);
+        soccerBallBody.velocity.z -= acceleration;
     }
     if (moveBackward) {
-        soccerBallBody.applyForce(new CANNON.Vec3(-forwardVector.x * force, 0, -forwardVector.z * force), soccerBallBody.position);
+        soccerBallBody.velocity.z += acceleration;
     }
     if (moveLeft) {
-        soccerBallBody.applyForce(new CANNON.Vec3(-rightVector.x * force, 0, -rightVector.z * force), soccerBallBody.position);
+        soccerBallBody.velocity.x -= acceleration;
     }
     if (moveRight) {
-        soccerBallBody.applyForce(new CANNON.Vec3(rightVector.x * force, 0, rightVector.z * force), soccerBallBody.position);
+        soccerBallBody.velocity.x += acceleration;
+    }
+
+    // Limit horizontal speed
+    const horizontalVelocity = new CANNON.Vec3(soccerBallBody.velocity.x, 0, soccerBallBody.velocity.z);
+    if (horizontalVelocity.length() > maxSpeed) {
+        horizontalVelocity.normalize();
+        horizontalVelocity.scale(maxSpeed, horizontalVelocity);
+        soccerBallBody.velocity.x = horizontalVelocity.x;
+        soccerBallBody.velocity.z = horizontalVelocity.z;
+    }
+
+    // Jumping
+    const isOnGround = Math.abs(soccerBallBody.position.y - 1) < 0.1 && soccerBallBody.velocity.y <= 0.01;
+    if (keys[' '] && isOnGround) {
+        soccerBallBody.velocity.y = 10;
     }
 }
 
@@ -234,5 +242,7 @@ function setupControls() {
         }
     });
 }
+
+// ... (other functions like createFloor, createMaze, setupLights remain the same)
 
 initGame();
