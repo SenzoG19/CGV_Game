@@ -5,7 +5,7 @@ import { wallsData } from '/scripts/wallsData.js';
 
 // Global variables
 let scene, camera, renderer, physicsWorld;
-let soccerBall, soccerBallBody;
+let ball, ballBody;
 let orbitControls;
 let walls = [];
 
@@ -29,7 +29,7 @@ function initGame() {
     initPhysics();
     createFloor();
     createMaze(wallsData);
-    createSoccerBall();
+    createBall();
     setupControls();
     setupLights();
     animate();
@@ -125,16 +125,16 @@ function createMaze(wallsData) {
     }
 }
 
-function createSoccerBall() {
+function createBall() {
     const sphereShape = new CANNON.Sphere(1);
-    soccerBallBody = new CANNON.Body({
+    ballBody = new CANNON.Body({
         mass: 1,
         position: new CANNON.Vec3(0, 5, 0),
         shape: sphereShape,
         material: new CANNON.Material({ restitution: 0.6 })
     });
-    soccerBallBody.linearDamping = 0.5;
-    physicsWorld.addBody(soccerBallBody);
+    ballBody.linearDamping = 0.5;
+    physicsWorld.addBody(ballBody);
 
     const geometry = new THREE.SphereGeometry(1, 32, 32);
     const material = new THREE.MeshStandardMaterial({
@@ -146,13 +146,13 @@ function createSoccerBall() {
         wireframe: true
     });
 
-    soccerBall = new THREE.Mesh(geometry, material);
-    soccerBall.castShadow = true;
-    soccerBall.receiveShadow = true;
-    scene.add(soccerBall);
+    ball = new THREE.Mesh(geometry, material);
+    ball.castShadow = true;
+    ball.receiveShadow = true;
+    scene.add(ball);
 
     const ballLight = new THREE.PointLight(0xffffff, 100, 100);
-    soccerBall.add(ballLight);
+    ball.add(ballLight);
 
     const lightHelper = new THREE.PointLightHelper(ballLight, 2);
     scene.add(lightHelper);
@@ -180,16 +180,16 @@ function animate() {
 
     updateMovement();
 
-    if (soccerBall) {
-        soccerBall.position.copy(soccerBallBody.position);
-        soccerBall.quaternion.copy(soccerBallBody.quaternion);
+    if (ball) {
+        ball.position.copy(ballBody.position);
+        ball.quaternion.copy(ballBody.quaternion);
     }
 
     orbitControls.update();
     renderer.render(scene, camera);
 }
 
-// Update movement logic for the soccer ball
+// Update movement logic for the ball
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
     const moveBackward = keys.ArrowDown || keys.s;
@@ -201,31 +201,31 @@ function updateMovement() {
 
     // Apply forces based on key presses
     if (moveForward) {
-        soccerBallBody.velocity.z -= acceleration;
+        ballBody.velocity.z -= acceleration;
     }
     if (moveBackward) {
-        soccerBallBody.velocity.z += acceleration;
+        ballBody.velocity.z += acceleration;
     }
     if (moveLeft) {
-        soccerBallBody.velocity.x -= acceleration;
+        ballBody.velocity.x -= acceleration;
     }
     if (moveRight) {
-        soccerBallBody.velocity.x += acceleration;
+        ballBody.velocity.x += acceleration;
     }
 
     // Limit horizontal speed
-    const horizontalVelocity = new CANNON.Vec3(soccerBallBody.velocity.x, 0, soccerBallBody.velocity.z);
+    const horizontalVelocity = new CANNON.Vec3(ballBody.velocity.x, 0, ballBody.velocity.z);
     if (horizontalVelocity.length() > maxSpeed) {
         horizontalVelocity.normalize();
         horizontalVelocity.scale(maxSpeed, horizontalVelocity);
-        soccerBallBody.velocity.x = horizontalVelocity.x;
-        soccerBallBody.velocity.z = horizontalVelocity.z;
+        ballBody.velocity.x = horizontalVelocity.x;
+        ballBody.velocity.z = horizontalVelocity.z;
     }
 
     // Jumping
-    const isOnGround = Math.abs(soccerBallBody.position.y - 1) < 0.1 && soccerBallBody.velocity.y <= 0.01;
+    const isOnGround = Math.abs(ballBody.position.y - 1) < 0.1 && ballBody.velocity.y <= 0.01;
     if (keys[' '] && isOnGround) {
-        soccerBallBody.velocity.y = 10;
+        ballBody.velocity.y = 10;
     }
 }
 
@@ -242,7 +242,5 @@ function setupControls() {
         }
     });
 }
-
-// ... (other functions like createFloor, createMaze, setupLights remain the same)
 
 initGame();
