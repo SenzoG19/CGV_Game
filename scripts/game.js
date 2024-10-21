@@ -126,6 +126,7 @@ function createMaze(wallsData) {
 }
 
 function createSoccerBall() {
+    // Create Cannon.js physics body for the ball
     const sphereShape = new CANNON.Sphere(1);
     soccerBallBody = new CANNON.Body({
         mass: 1,
@@ -136,52 +137,49 @@ function createSoccerBall() {
     soccerBallBody.linearDamping = 0.5;
     physicsWorld.addBody(soccerBallBody);
 
+    // Create a Three.js material with emissive glow
     const geometry = new THREE.SphereGeometry(1, 32, 32);
-    const material = new THREE.ShaderMaterial({
-        uniforms: {
-            color: { value: new THREE.Color(0xff0000) },
-            glowColor: { value: new THREE.Color(0xff0000) },
-            glowStrength: { value: 0.5 }
-        },
-        vertexShader: `
-            varying vec3 vNormal;
-            void main() {
-                vNormal = normalize(normalMatrix * normal);
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform vec3 color;
-            uniform vec3 glowColor;
-            uniform float glowStrength;
-            varying vec3 vNormal;
-            void main() {
-                float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 4.0);
-                gl_FragColor = vec4(color, 1.0) + vec4(glowColor * glowStrength * intensity, 1.0);
-            }
-        `
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xff0000,   // Red color for the ball
+        emissive: 0xff0000, // Emissive glow in red
+        emissiveIntensity: 1.5, // Glow strength
+        roughness: 0.4,
+        metalness: 0.2,
+        wireframe: false
     });
 
+    // Create the soccer ball mesh
     soccerBall = new THREE.Mesh(geometry, material);
     soccerBall.castShadow = true;
     soccerBall.receiveShadow = true;
     soccerBall.position.copy(soccerBallBody.position);
     scene.add(soccerBall);
+
+    // Create a point light attached to the soccer ball
+// Add this after creating the PointLight
+const ballLight = new THREE.PointLight(0xffffff, 100, 100);  // Light intensity 2, range 10
+soccerBall.add(ballLight);  // Attach the light to the soccer ball
+
+// Create a light helper to visualize the light's range
+const lightHelper = new THREE.PointLightHelper(ballLight, 2); // Adjust size as needed
+scene.add(lightHelper);
+  // Attach the light to the ball
 }
 
+
 function setupLights() {
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    // directionalLight.position.set(10, 20, 10);
+    // directionalLight.castShadow = true;
+    // scene.add(directionalLight);
 
-    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-    pointLight.position.set(0, 10, 0);
-    pointLight.castShadow = true;
-    scene.add(pointLight);
+    // const pointLight = new THREE.PointLight(0xffffff, 20, 100);
+    // pointLight.position.set(0, 10, 0);
+    // pointLight.castShadow = true;
+    // scene.add(pointLight);
 }
 
 function animate() {
