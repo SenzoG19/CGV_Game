@@ -12,13 +12,16 @@ export class MazeWorld {
 
         this.createFloor();
         this.walls = [];
+        //this.setupLights();
     }
 
     createFloor() {
         const floorSize = 100; // Adjust as needed
-        const floorMaterial = new THREE.MeshLambertMaterial({
+        const floorMaterial = new THREE.MeshStandardMaterial({
             color: "orange",
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            roughness: 0.8,
+            metalness: 0.2
         });
 
         // Create floor
@@ -39,7 +42,11 @@ export class MazeWorld {
     }
 
     createWall(x, z, length, height, isAlignedWithZ) {
-        const wallMaterial = new THREE.MeshLambertMaterial({ color: "cyan" });
+        const wallMaterial = new THREE.MeshStandardMaterial({
+            color: "cyan",
+            roughness: 0.7,
+            metalness: 0.3
+        });
 
         // Create wall mesh
         const wallGeometry = new THREE.BoxGeometry(
@@ -49,6 +56,8 @@ export class MazeWorld {
         );
         const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
         wallMesh.position.set(x, height / 2, z);
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
         this.scene.add(wallMesh);
 
         // Create wall physics
@@ -64,6 +73,24 @@ export class MazeWorld {
 
         this.walls.push({ mesh: wallMesh, body: wallBody });
     }
+
+    // setupLights() {
+    //     // Add ambient light
+    //     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    //     this.scene.add(ambientLight);
+
+    //     // Add directional light
+    //     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    //     directionalLight.position.set(10, 20, 10);
+    //     directionalLight.castShadow = true;
+    //     this.scene.add(directionalLight);
+
+    //     // Add point light
+    //     const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+    //     pointLight.position.set(0, 10, 0);
+    //     pointLight.castShadow = true;
+    //     this.scene.add(pointLight);
+    // }
 
     createMaze(wallsData) {
         for (const wall of wallsData) {
