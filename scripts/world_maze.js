@@ -8,7 +8,7 @@ export class MazeWorld {
         this.physicsWorld.gravity.set(0, -9.82, 0);
 
         this.cellSize = 5;
-        this.wallThickness = 0.5;
+        this.wallThickness = 1.5;
 
         this.createFloor();
         this.walls = [];
@@ -17,7 +17,7 @@ export class MazeWorld {
     createFloor() {
         const floorSize = 100; // Adjust as needed
         const floorMaterial = new THREE.MeshLambertMaterial({
-            color: 0x404040,
+            color: "orange",
             side: THREE.DoubleSide
         });
 
@@ -26,6 +26,9 @@ export class MazeWorld {
         const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
         floorMesh.rotation.x = -Math.PI / 2;
         this.scene.add(floorMesh);
+
+        const gridHelper = new THREE.GridHelper(100, 100);
+        this.scene.add(gridHelper);
 
         // Create floor physics
         const floorShape = new CANNON.Plane();
@@ -36,7 +39,7 @@ export class MazeWorld {
     }
 
     createWall(x, z, length, height, isAlignedWithZ) {
-        const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+        const wallMaterial = new THREE.MeshLambertMaterial({ color: "cyan" });
 
         // Create wall mesh
         const wallGeometry = new THREE.BoxGeometry(

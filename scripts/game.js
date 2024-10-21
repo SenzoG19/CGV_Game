@@ -6,7 +6,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { MazeWorld } from './world_maze.js';
 
 // Global variables
-let modelMaze, mazeWorld, scene, camera, renderer, soccerBall, soccerBallBody, spotLight;
+let modelMaze, mazeWorld, scene, camera, renderer, spotLight;
+let soccerBall, soccerBallBody;
 let orbitControls;
 
 const keys = {
@@ -19,7 +20,6 @@ const keys = {
     a: false,
     d: false,
     ' ': false,
-    v: false
 };
 let mouseDown = false;
 
@@ -34,60 +34,85 @@ function initGame() {
 }
 
 function initPhysics() {
+    // Initialize MazeWorld and set up physics
     mazeWorld = new MazeWorld();
 
     const wallsData = [
-        { x: 0, z: 50, length: 100.5, height: 7, isAlignedWithZ: 0 },
-        { x: -50, z: 0, length: 100.5, height: 7, isAlignedWithZ: 1 },
-        { x: 0, z: -50, length: 100.5, height: 7, isAlignedWithZ: 0 },
-        { x: 50, z: 0, length: 100.5, height: 7, isAlignedWithZ: 1 },
+        { x: 0, z: 50, length: 101.5, height: 7, isAlignedWithZ: 0 },
+        { x: -50, z: 0, length: 101.5, height: 7, isAlignedWithZ: 1 },
+        { x: 0, z: -50, length: 101.5, height: 7, isAlignedWithZ: 0 },
+        { x: 50, z: 0, length: 101.5, height: 7, isAlignedWithZ: 1 },
+        
+        //Walls aligned with the X-axis
+        { x: -41, z: -12, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: -41, z: 21, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: -33, z: -21, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: -33, z: 4, length: 25.5, height: 7, isAlignedWithZ: 1 },
+        { x: -25, z: -37, length: 24.5, height: 7, isAlignedWithZ: 1 },
+        { x: -25, z: 25, length: 33.5, height: 7, isAlignedWithZ: 1 },
+        { x: -16, z: 8, length: 16.5, height: 7, isAlignedWithZ: 1 },
+        { x: -16, z: 8, length: 16.5, height: 7, isAlignedWithZ: 1 },
+        { x: -16, z: -38, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: -8, z: 12, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: -8, z: -17, length: 33.5, height: 7, isAlignedWithZ: 1 },
+        { x: -8, z: -46, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 0, z: 33, length: 34.5, height: 7, isAlignedWithZ: 1 },
+        { x: 0, z: 4, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 0, z: -29, length: 24.5, height: 7, isAlignedWithZ: 1 },
+        { x: 8, z: 37, length: 26.5, height: 7, isAlignedWithZ: 1 },
+        { x: 8, z: 16, length: 17.5, height: 7, isAlignedWithZ: 0 },
+        { x: 8, z: -13, length: 25.5, height: 7, isAlignedWithZ: 1 },
+        { x: 8, z: -42, length: 17.5, height: 7, isAlignedWithZ: 1 },
+        { x: 17, z: 17, length: 17.5, height: 7, isAlignedWithZ: 1 },
+        { x: 17, z: -29, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 13, z: 33, length: 8.5, height: 7, isAlignedWithZ: 0 },
+        { x: 25, z: 33, length: 16.5, height: 7, isAlignedWithZ: 1 },
+        { x: 25, z: 4, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 25, z: -29, length: 25.5, height: 7, isAlignedWithZ: 1 },
+        { x: 33, z: -13, length: 24.5, height: 7, isAlignedWithZ: 1 },
+        { x: 33, z: -46, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 33, z: 12, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 33, z: 37, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 42, z: 25, length: 16.5, height: 7, isAlignedWithZ: 1 },
+        { x: 42, z: 46, length: 8.5, height: 7, isAlignedWithZ: 1 },
+        { x: 42, z: -17, length: 50.5, height: 7, isAlignedWithZ: 1 },
 
+        //Walls aligned with the Z-axis
+        { x: -33, z: -41, length: 16.5, height: 7, isAlignedWithZ: 0 },
+        { x: 21, z: -41, length: 8.5, height: 7, isAlignedWithZ: 0 },
+        { x: -41, z: -33, length: 16.5, height: 7, isAlignedWithZ: 0 },
+        { x: -12, z: -33, length: 9.5, height: 7, isAlignedWithZ: 0 },
     ];
 
     mazeWorld.createMaze(wallsData);
-
     scene = mazeWorld.scene;
 
-    // Soccer ball setup commented out as we won't control it anymore
-    /*
-    const sphereShape = new CANNON.Sphere(0.5);
+    // Soccer ball setup
+    const sphereShape = new CANNON.Sphere(1); // Radius of the ball
     soccerBallBody = new CANNON.Body({
-        mass: 5,
-        position: mazeWorld.getStartPosition(),
+        mass: 1,
+        position: new CANNON.Vec3(0, 5, 0), // Start position of the ball
         shape: sphereShape,
-        material: new CANNON.Material({ restitution: 0.5 })
+        material: new CANNON.Material({ restitution: 0.6 }) // Bounciness
     });
 
-    soccerBallBody.linearDamping = 0.5;
+    soccerBallBody.linearDamping = 0.5; // Damping to slow down over time
     mazeWorld.addBody(soccerBallBody);
-    */
+
+    createSoccerBall(); // Create the visual representation of the ball
 }
 
-function loadSoccerBall() {
-    const loader = new GLTFLoader();
-    loader.load(
-        './models/soccer_ball.glb',
-        (gltf) => {
-            soccerBall = gltf.scene;
-            soccerBall.castShadow = true;
-            soccerBall.receiveShadow = true;
+function createSoccerBall() {
+    const geometry = new THREE.SphereGeometry(1, 32, 32); // Radius = 1, detail = 32
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 }); // Red ball
+    soccerBall = new THREE.Mesh(geometry, material);
+    soccerBall.castShadow = true;
+    soccerBall.receiveShadow = true;
 
-            // Position the soccer ball in the scene
-            // soccerBall.position.copy(soccerBallBody.position);
-            soccerBall.scale.set(0.5, 0.5, 0.5);
-
-            mazeWorld.addToScene(soccerBall);
-            // camera.lookAt(soccerBall.position);
-        },
-        (xhr) => {
-            console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-        },
-        (error) => {
-            console.error('An error occurred loading the model', error);
-        }
-    );
+    // Initial positioning of the ball in the scene
+    soccerBall.position.copy(soccerBallBody.position);
+    scene.add(soccerBall);
 }
-
 function loadMaze() {
     const loader = new OBJLoader();
     loader.load(
@@ -103,6 +128,9 @@ function loadMaze() {
             object.scale.set(5, 1, 5); // Adjust the scale as needed
             object.position.set(0, 0, 0); // Adjust the position as needed
             scene.add(object); // Add the loaded object to the scene
+
+            // Create walls based on the loaded maze
+            //createPhysicsForMaze(object);
         },
         (xhr) => {
             console.log((xhr.loaded / xhr.total * 100) + '% loaded');
@@ -112,6 +140,40 @@ function loadMaze() {
         }
     );
 }
+
+// function createPhysicsForMaze(mazeObject) {
+//     mazeObject.traverse((child) => {
+//         if (child.isMesh) {
+//             const geometry = child.geometry;
+
+//             geometry.computeBoundingBox(); // Compute bounding box for the mesh
+//             const boundingBox = geometry.boundingBox;
+
+//             // Calculate dimensions based on bounding box
+//             const dimensions = new THREE.Vector3(
+//                 boundingBox.max.x - boundingBox.min.x,
+//                 boundingBox.max.y - boundingBox.min.y,
+//                 boundingBox.max.z - boundingBox.min.z
+//             );
+
+//             // Calculate the center position of the wall
+//             const position = new THREE.Vector3();
+//             boundingBox.getCenter(position);
+//             child.localToWorld(position);
+
+//             // Create a CANNON.js box shape and body
+//             const halfExtents = new CANNON.Vec3(dimensions.x / 2, dimensions.y / 2, dimensions.z / 2);
+//             const boxShape = new CANNON.Box(halfExtents);
+//             const wallBody = new CANNON.Body({
+//                 mass: 0, // Static body
+//                 position: new CANNON.Vec3(position.x, position.y, position.z)
+//             });
+
+//             wallBody.addShape(boxShape);
+//             mazeWorld.addBody(wallBody);
+//         }
+//     });
+// }
 
 function initScene() {
     camera = new THREE.PerspectiveCamera(
@@ -130,7 +192,6 @@ function initScene() {
     renderer.setClearColor(0x87CEEB);
     canvasContainer.appendChild(renderer.domElement);
 
-    loadSoccerBall();
     loadMaze();
 
     const ambientLight = new THREE.AmbientLight(0xffffff);
@@ -162,52 +223,44 @@ function animate() {
     requestAnimationFrame(animate);
     mazeWorld.update();
 
-    // Commented out soccer ball position updates
-    /*
+    updateMovement();
+
     if (soccerBall) {
         soccerBall.position.copy(soccerBallBody.position);
         soccerBall.quaternion.copy(soccerBallBody.quaternion);
     }
-    */
+
 
     // Update controls
     orbitControls.update();
 
-    // Rendering the scene
+    // Render the scene
     renderer.render(scene, camera);
 }
 
-// Commented out the updateMovement function
-/*
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
     const moveBackward = keys.ArrowDown || keys.s;
     const moveLeft = keys.ArrowLeft || keys.a;
     const moveRight = keys.ArrowRight || keys.d;
 
-    const forwardVector = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
-    const rightVector = new THREE.Vector3().crossVectors(forwardVector, new THREE.Vector3(0, 1, 0)).normalize();
-
     const force = 10;
+    const forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+
     if (moveForward) {
-        soccerBallBody.applyForce(new CANNON.Vec3(-forwardVector.x * force, 0, -forwardVector.z * force), soccerBallBody.position);
-    }
-    if (moveBackward) {
         soccerBallBody.applyForce(new CANNON.Vec3(forwardVector.x * force, 0, forwardVector.z * force), soccerBallBody.position);
     }
-    if (moveLeft) {
-        soccerBallBody.applyForce(new CANNON.Vec3(rightVector.x * force, 0, rightVector.z * force), soccerBallBody.position);
+    if (moveBackward) {
+        soccerBallBody.applyForce(new CANNON.Vec3(-forwardVector.x * force, 0, -forwardVector.z * force), soccerBallBody.position);
     }
-    if (moveRight) {
+    if (moveLeft) {
         soccerBallBody.applyForce(new CANNON.Vec3(-rightVector.x * force, 0, -rightVector.z * force), soccerBallBody.position);
     }
-
-    const isOnGround = Math.abs(soccerBallBody.position.y - 0.5) < 0.1 && soccerBallBody.velocity.y <= 0.01;
-    if (keys[' '] && isOnGround) {
-        soccerBallBody.velocity.y = 5;
+    if (moveRight) {
+        soccerBallBody.applyForce(new CANNON.Vec3(rightVector.x * force, 0, rightVector.z * force), soccerBallBody.position);
     }
 }
-*/
 
 function setupControls() {
     window.addEventListener('keydown', (event) => {
@@ -224,22 +277,3 @@ function setupControls() {
 }
 
 initGame();
-// Event listener for the start button
-// document.getElementById('startButton').addEventListener('click', () => {
-//     document.getElementById('menu').style.display = 'none';
-//     document.getElementById('canvasContainer').style.display = 'block';
-//     initGame();
-// });
-
-// // Other menu options
-// document.getElementById('levelButton').addEventListener('click', () => {
-//     alert("Select Level clicked!");
-// });
-
-// document.getElementById('optionsButton').addEventListener('click', () => {
-//     alert("Options menu clicked!");
-// });
-
-// document.getElementById('quitButton').addEventListener('click', () => {
-//     alert("Quit option clicked!");
-// });
