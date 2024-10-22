@@ -34,6 +34,7 @@ function initGame() {
     createBall();
     loadGoal(); 
     setupControls();
+    setupPointerLock(); 
     setupLights();
     animate();
 }
@@ -42,8 +43,9 @@ function initScene() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-    // Set an initial position behind and above the ball
-    camera.position.set(0, 10, -10);
+    // Set initial camera position and rotation
+    camera.position.copy(cameraOffset);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
 
     const canvasContainer = document.getElementById('canvasContainer');
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -206,11 +208,8 @@ function animate() {
             showGameCompleted();
         }
 
-        // Camera follows the ball with a smooth motion
-        const cameraOffset = new THREE.Vector3(0, 10, -10); // Adjust the offset as needed
-        const cameraTarget = ball.position.clone().add(cameraOffset);
-        camera.position.lerp(cameraTarget, 0.1); // Smooth transition
-        camera.lookAt(ball.position); // Keep looking at the ball
+        // Update camera position and rotation
+        updateCamera();
     }
 
     renderer.render(scene, camera);
@@ -224,6 +223,73 @@ function showGameCompleted() {
     ballBody.velocity.set(0, 0, 0);
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('keyup', handleKeyUp);
+}
+
+function setupPointerLock() {
+    const canvasContainer = document.getElementById('canvasContainer');
+
+    // Request pointer lock when clicking on the canvas
+    canvasContainer.addEventListener('click', function () {
+        canvasContainer.requestPointerLock();
+    });
+
+    // Listen for pointer lock state change events
+    document.addEventListener('pointerlockchange', function () {
+        if (document.pointerLockElement === canvasContainer) {
+            console.log('Pointer locked');
+            document.addEventListener('mousemove', updateCameraRotation, false);
+        } else {
+            console.log('Pointer unlocked');
+            document.removeEventListener('mousemove', updateCameraRotation, false);
+        }
+    });
+
+    // Release pointer lock on Escape key
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            document.exitPointerLock();
+        }
+    });
+}
+
+
+let cameraOffset = new THREE.Vector3(0, 10, -10);
+let cameraRotation = {
+    yaw: 0,
+    pitch: 0
+};
+
+function updateCameraRotation(event) {
+    const sensitivity = 0.002;
+
+    // Update rotation angles
+    cameraRotation.yaw -= event.movementX * sensitivity;
+    cameraRotation.pitch -= event.movementY * sensitivity;
+
+    // Clamp the pitch to avoid camera flipping
+    cameraRotation.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.pitch));
+}
+
+function updateCamera() {
+    if (!ball) return;
+
+    // Calculate the camera offset based on current rotation
+    const rotatedOffset = new THREE.Vector3(
+        Math.sin(cameraRotation.yaw) * cameraOffset.z,
+        cameraOffset.y,
+        Math.cos(cameraRotation.yaw) * cameraOffset.z
+    );
+
+    // Set camera position relative to ball
+    const targetPosition = ball.position.clone().add(rotatedOffset);
+    camera.position.lerp(targetPosition, 0.1);
+
+    // Create a look target slightly above the ball
+    const lookTarget = ball.position.clone().add(new THREE.Vector3(0, 2, 0));
+    camera.lookAt(lookTarget);
+
+    // Apply pitch rotation
+    camera.rotateX(cameraRotation.pitch);
 }
 
 function updateMovement() {
