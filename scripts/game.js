@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'; 
 import { wallsData } from '/scripts/wallsData.js';
 
 // Global variables
 let scene, camera, renderer, physicsWorld;
 let ball, ballBody;
-let orbitControls;
+let soccerGoal;
+// let orbitControls;
 let walls = [];
 
 const keys = {
@@ -30,6 +32,7 @@ function initGame() {
     createFloor();
     createMaze(wallsData);
     createBall();
+    loadGoal(); 
     setupControls();
     setupLights();
     animate();
@@ -38,7 +41,7 @@ function initGame() {
 function initScene() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 80, 0);
+    camera.position.set(0, 100, 0);
     camera.lookAt(new THREE.Vector3(0, 0, 0));
 
     const canvasContainer = document.getElementById('canvasContainer');
@@ -49,13 +52,13 @@ function initScene() {
     renderer.setPixelRatio(window.devicePixelRatio);
     canvasContainer.appendChild(renderer.domElement);
 
-    // Add OrbitControls for camera control
-    orbitControls = new OrbitControls(camera, renderer.domElement);
-    orbitControls.enableDamping = true;
-    orbitControls.dampingFactor = 0.05;
-    orbitControls.enableZoom = true;
-    orbitControls.minDistance = 10;
-    orbitControls.maxDistance = 100;
+    // // Add OrbitControls for camera control
+    // orbitControls = new OrbitControls(camera, renderer.domElement);
+    // orbitControls.enableDamping = true;
+    // orbitControls.dampingFactor = 0.05;
+    // orbitControls.enableZoom = true;
+    // orbitControls.minDistance = 10;
+    // orbitControls.maxDistance = 100;
 }
 
 function initPhysics() {
@@ -64,7 +67,7 @@ function initPhysics() {
 }
 
 function createFloor() {
-    const floorSize = 100;
+    const floorSize = 150;
     const floorMaterial = new THREE.MeshStandardMaterial({
         color: "cyan",
         side: THREE.DoubleSide,
@@ -88,7 +91,14 @@ function createFloor() {
     physicsWorld.addBody(floorBody);
 }
 
+const scaleFactor = 1; //need to change this to like 1.2 or something, right now it riuns the walls which is a no go
+
 function createWall(x, z, length, height, isAlignedWithZ) {
+    const scaledX = x * scaleFactor;
+    const scaledZ = z * scaleFactor;
+    const scaledLength = length * scaleFactor;
+    const scaledHeight = height * scaleFactor;
+
     const wallMaterial = new THREE.MeshStandardMaterial({
         color: "cyan",
         roughness: 0.7,
@@ -96,20 +106,20 @@ function createWall(x, z, length, height, isAlignedWithZ) {
     });
 
     const wallGeometry = new THREE.BoxGeometry(
-        isAlignedWithZ ? wallThickness : length,
-        height,
-        isAlignedWithZ ? length : wallThickness
+        isAlignedWithZ ? wallThickness : scaledLength,
+        scaledHeight,
+        isAlignedWithZ ? scaledLength : wallThickness
     );
     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-    wallMesh.position.set(x, height / 2, z);
+    wallMesh.position.set(scaledX, scaledHeight / 2, scaledZ);
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
     scene.add(wallMesh);
 
     const wallShape = new CANNON.Box(new CANNON.Vec3(
-        isAlignedWithZ ? wallThickness / 2 : length / 2,
-        height / 2,
-        isAlignedWithZ ? length / 2 : wallThickness / 2
+        isAlignedWithZ ? wallThickness / 2 : scaledLength / 2,
+        scaledHeight / 2,
+        isAlignedWithZ ? scaledLength / 2 : wallThickness / 2
     ));
     const wallBody = new CANNON.Body({ mass: 0 });
     wallBody.addShape(wallShape);
@@ -126,24 +136,24 @@ function createMaze(wallsData) {
 }
 
 function createBall() {
-    const sphereShape = new CANNON.Sphere(1);
+    const sphereShape = new CANNON.Sphere(0.5);
     ballBody = new CANNON.Body({
         mass: 1,
-        position: new CANNON.Vec3(0,1, -45),
+        position: new CANNON.Vec3(0,1, -65),
         shape: sphereShape,
         material: new CANNON.Material({ restitution: 0.6 })
     });
     ballBody.linearDamping = 0.5;
     physicsWorld.addBody(ballBody);
 
-    const geometry = new THREE.SphereGeometry(1, 32, 32);
+    const geometry = new THREE.SphereGeometry(0.5, 32, 32);
     const material = new THREE.MeshStandardMaterial({
-        color: 0xff0000,
-        emissive: 0xff0000,
-        emissiveIntensity: 1.5,
+        color: 0xffffff,
+        emissive: "yellow",
+        emissiveIntensity: 1.5 ,
         roughness: 0.4,
-        metalness: 0.2,
-        wireframe: true
+        metalness: 0.8,
+        wireframe: false
     });
 
     ball = new THREE.Mesh(geometry, material);
@@ -151,11 +161,33 @@ function createBall() {
     ball.receiveShadow = true;
     scene.add(ball);
 
-    const ballLight = new THREE.PointLight(0xffffff, 100, 100);
+    const ballLight = new THREE.PointLight("yellow", 100, 100);
     ball.add(ballLight);
 
     const lightHelper = new THREE.PointLightHelper(ballLight, 2);
     scene.add(lightHelper);
+}
+
+// Function to load the goal model
+function loadGoal() {
+    const loader = new GLTFLoader();
+    console.log('Loading goal model...'); // Log before loading
+
+    loader.load(
+        './soccerGoal.glb', 
+        function(gltf) {
+            alert('Loaded the goal model successfully!'); // Alert message on successful load
+            console.log('Goal model loaded successfully:', gltf); // Log on successful load
+            soccerGoal = gltf.scene;
+            soccerGoal.scale.set(0, 12, 0); 
+            soccerGoal.position.set(0, 20, 0);  
+            scene.add(soccerGoal);  // Add the loaded model to the scene
+        }, 
+        undefined, 
+        function(error) {
+            console.error('An error happened while loading the GLTF model:', error);
+        }
+    );
 }
 
 
@@ -163,15 +195,10 @@ function setupLights() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
     scene.add(ambientLight);
 
-    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    // directionalLight.position.set(10, 20, 10);
-    // directionalLight.castShadow = true;
-    // scene.add(directionalLight);
-
-    // const pointLight = new THREE.PointLight(0xffffff, 20, 100);
-    // pointLight.position.set(0, 10, 0);
-    // pointLight.castShadow = true;
-    // scene.add(pointLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 10);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
 }
 
 function animate() {
@@ -185,7 +212,7 @@ function animate() {
         ball.quaternion.copy(ballBody.quaternion);
     }
 
-    orbitControls.update();
+    // orbitControls.update();
     renderer.render(scene, camera);
 }
 
