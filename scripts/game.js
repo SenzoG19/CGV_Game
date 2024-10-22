@@ -158,8 +158,8 @@ function createBall() {
     const ballLight = new THREE.PointLight("yellow", 100, 100);
     ball.add(ballLight);
 
-    const lightHelper = new THREE.PointLightHelper(ballLight, 2);
-    scene.add(lightHelper);
+    // const lightHelper = new THREE.PointLightHelper(ballLight, 2);
+    // scene.add(lightHelper);
 }
 
 function loadGoal() {
@@ -191,7 +191,7 @@ function setupLights() {
 }
 
 // Add target position for the end of the maze
-const targetPosition = new THREE.Vector3(4, 1, 51);
+const targetPosition = new THREE.Vector3(4, 1, 55);
 
 function animate() {
     requestAnimationFrame(animate);
@@ -301,20 +301,40 @@ function updateMovement() {
     const acceleration = 20 * (1 / 60);
     const maxSpeed = 10;
 
-    
+    // Get the camera's forward and right vectors
+    const cameraDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraDirection);  // Forward direction of the camera
+
+    const cameraRight = new THREE.Vector3();
+    cameraRight.crossVectors(camera.up, cameraDirection).normalize();  // Right direction
+
+    // Compute the direction of movement relative to the camera
+    let moveDirection = new CANNON.Vec3();
+
     if (moveForward) {
-        ballBody.velocity.z += acceleration; 
+        moveDirection.x += cameraDirection.x;
+        moveDirection.z += cameraDirection.z;
     }
     if (moveBackward) {
-        ballBody.velocity.z -= acceleration; 
+        moveDirection.x -= cameraDirection.x;
+        moveDirection.z -= cameraDirection.z;
     }
     if (moveLeft) {
-        ballBody.velocity.x += acceleration; 
+        moveDirection.x += cameraRight.x;
+        moveDirection.z += cameraRight.z;
     }
     if (moveRight) {
-        ballBody.velocity.x -= acceleration; 
+        moveDirection.x -= cameraRight.x;
+        moveDirection.z -= cameraRight.z;
     }
 
+    if (moveDirection.length() > 0) {
+        moveDirection.normalize();  // Normalize direction to ensure uniform speed
+        ballBody.velocity.x += moveDirection.x * acceleration;
+        ballBody.velocity.z += moveDirection.z * acceleration;
+    }
+
+    // Apply maximum speed clamp
     const horizontalVelocity = new CANNON.Vec3(ballBody.velocity.x, 0, ballBody.velocity.z);
     if (horizontalVelocity.length() > maxSpeed) {
         horizontalVelocity.normalize();
@@ -329,6 +349,7 @@ function updateMovement() {
         ballBody.velocity.y = 10;  // Jump velocity
     }
 }
+
 
 
 function setupControls() {
