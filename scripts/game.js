@@ -129,7 +129,7 @@ function createBall() {
     const sphereShape = new CANNON.Sphere(1);
     ballBody = new CANNON.Body({
         mass: 1,
-        position: new CANNON.Vec3(0, 5, 0),
+        position: new CANNON.Vec3(0,1, -45),
         shape: sphereShape,
         material: new CANNON.Material({ restitution: 0.6 })
     });
