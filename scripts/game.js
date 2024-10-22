@@ -41,8 +41,9 @@ function initGame() {
 function initScene() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 100, 0);
-    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    // Set an initial position behind and above the ball
+    camera.position.set(0, 10, -10);
 
     const canvasContainer = document.getElementById('canvasContainer');
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -52,6 +53,7 @@ function initScene() {
     renderer.setPixelRatio(window.devicePixelRatio);
     canvasContainer.appendChild(renderer.domElement);
 }
+
 
 function initPhysics() {
     physicsWorld = new CANNON.World();
@@ -73,8 +75,8 @@ function createFloor() {
     floorMesh.receiveShadow = true;
     scene.add(floorMesh);
 
-    const gridHelper = new THREE.GridHelper(100, 100);
-    scene.add(gridHelper);
+    // const gridHelper = new THREE.GridHelper(100, 100);
+    // scene.add(gridHelper);
 
     const floorShape = new CANNON.Plane();
     const floorBody = new CANNON.Body({ mass: 0 });
@@ -129,7 +131,7 @@ function createBall() {
     const sphereShape = new CANNON.Sphere(0.5);
     ballBody = new CANNON.Body({
         mass: 1,
-        position: new CANNON.Vec3(4, 1, 45),
+        position: new CANNON.Vec3(0, 1, -65),
         shape: sphereShape,
         material: new CANNON.Material({ restitution: 0.6 })
     });
@@ -180,10 +182,10 @@ function setupLights() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+//     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+//     directionalLight.position.set(10, 20, 10);
+//     directionalLight.castShadow = true;
+//     scene.add(directionalLight);
 }
 
 // Add target position for the end of the maze
@@ -203,10 +205,17 @@ function animate() {
         if (ball.position.distanceTo(targetPosition) < 2) {
             showGameCompleted();
         }
+
+        // Camera follows the ball with a smooth motion
+        const cameraOffset = new THREE.Vector3(0, 10, -10); // Adjust the offset as needed
+        const cameraTarget = ball.position.clone().add(cameraOffset);
+        camera.position.lerp(cameraTarget, 0.1); // Smooth transition
+        camera.lookAt(ball.position); // Keep looking at the ball
     }
 
     renderer.render(scene, camera);
 }
+
 
 // Show "Game Completed" when the ball reaches the end
 function showGameCompleted() {
@@ -247,9 +256,10 @@ function updateMovement() {
         ballBody.velocity.z = horizontalVelocity.z;
     }
 
-    const isOnGround = Math.abs(ballBody.position.y - 1) < 0.1 && ballBody.velocity.y <= 0.01;
+    // Add jumping logic when spacebar is pressed
+    const isOnGround = Math.abs(ballBody.position.y - 0.5) < 0.05;
     if (keys[' '] && isOnGround) {
-        ballBody.velocity.y = 10;
+        ballBody.velocity.y = 10;  // Jump velocity, adjust the value for the desired jump height
     }
 }
 
