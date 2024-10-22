@@ -253,7 +253,7 @@ function setupPointerLock() {
 }
 
 
-let cameraOffset = new THREE.Vector3(0, 10, -10);
+let cameraOffset = new THREE.Vector3(0, 5, -5);
 let cameraRotation = {
     yaw: 0,
     pitch: 0
@@ -301,17 +301,18 @@ function updateMovement() {
     const acceleration = 20 * (1 / 60);
     const maxSpeed = 10;
 
+    
     if (moveForward) {
-        ballBody.velocity.z -= acceleration;
+        ballBody.velocity.z += acceleration; 
     }
     if (moveBackward) {
-        ballBody.velocity.z += acceleration;
+        ballBody.velocity.z -= acceleration; 
     }
     if (moveLeft) {
-        ballBody.velocity.x -= acceleration;
+        ballBody.velocity.x += acceleration; 
     }
     if (moveRight) {
-        ballBody.velocity.x += acceleration;
+        ballBody.velocity.x -= acceleration; 
     }
 
     const horizontalVelocity = new CANNON.Vec3(ballBody.velocity.x, 0, ballBody.velocity.z);
@@ -322,12 +323,13 @@ function updateMovement() {
         ballBody.velocity.z = horizontalVelocity.z;
     }
 
-    // Add jumping logic when spacebar is pressed
+    // Jumping logic (unchanged)
     const isOnGround = Math.abs(ballBody.position.y - 0.5) < 0.05;
     if (keys[' '] && isOnGround) {
-        ballBody.velocity.y = 10;  // Jump velocity, adjust the value for the desired jump height
+        ballBody.velocity.y = 10;  // Jump velocity
     }
 }
+
 
 function setupControls() {
     window.addEventListener('keydown', handleKeyDown);
