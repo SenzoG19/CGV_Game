@@ -8,7 +8,6 @@ import { wallsData } from '/scripts/wallsData.js';
 let scene, camera, renderer, physicsWorld;
 let ball, ballBody;
 let soccerGoal;
-// let orbitControls;
 let walls = [];
 
 const keys = {
@@ -25,6 +24,7 @@ const keys = {
 
 const cellSize = 5;
 const wallThickness = 1.5;
+const scaleFactor = 1; // Scale factor for walls
 
 function initGame() {
     initScene();
@@ -51,14 +51,6 @@ function initScene() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     canvasContainer.appendChild(renderer.domElement);
-
-    // // Add OrbitControls for camera control
-    // orbitControls = new OrbitControls(camera, renderer.domElement);
-    // orbitControls.enableDamping = true;
-    // orbitControls.dampingFactor = 0.05;
-    // orbitControls.enableZoom = true;
-    // orbitControls.minDistance = 10;
-    // orbitControls.maxDistance = 100;
 }
 
 function initPhysics() {
@@ -90,8 +82,6 @@ function createFloor() {
     floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
     physicsWorld.addBody(floorBody);
 }
-
-const scaleFactor = 1; //need to change this to like 1.2 or something, right now it riuns the walls which is a no go
 
 function createWall(x, z, length, height, isAlignedWithZ) {
     const scaledX = x * scaleFactor;
@@ -139,7 +129,7 @@ function createBall() {
     const sphereShape = new CANNON.Sphere(0.5);
     ballBody = new CANNON.Body({
         mass: 1,
-        position: new CANNON.Vec3(0,1, -65),
+        position: new CANNON.Vec3(4, 1, 45),
         shape: sphereShape,
         material: new CANNON.Material({ restitution: 0.6 })
     });
@@ -150,7 +140,7 @@ function createBall() {
     const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: "yellow",
-        emissiveIntensity: 1.5 ,
+        emissiveIntensity: 1.5,
         roughness: 0.4,
         metalness: 0.8,
         wireframe: false
@@ -168,28 +158,23 @@ function createBall() {
     scene.add(lightHelper);
 }
 
-// Function to load the goal model
 function loadGoal() {
     const loader = new GLTFLoader();
-    console.log('Loading goal model...'); // Log before loading
-
     loader.load(
-        './soccerGoal.glb', 
+        './soccerGoal.glb',
         function(gltf) {
-            alert('Loaded the goal model successfully!'); // Alert message on successful load
-            console.log('Goal model loaded successfully:', gltf); // Log on successful load
+            console.log('Goal model loaded successfully:', gltf);
             soccerGoal = gltf.scene;
-            soccerGoal.scale.set(0, 12, 0); 
-            soccerGoal.position.set(0, 20, 0);  
-            scene.add(soccerGoal);  // Add the loaded model to the scene
-        }, 
-        undefined, 
+            soccerGoal.scale.set(0, 12, 0);
+            soccerGoal.position.set(0, 20, 0);
+            scene.add(soccerGoal);
+        },
+        undefined,
         function(error) {
             console.error('An error happened while loading the GLTF model:', error);
         }
     );
 }
-
 
 function setupLights() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
@@ -201,6 +186,9 @@ function setupLights() {
     scene.add(directionalLight);
 }
 
+// Add target position for the end of the maze
+const targetPosition = new THREE.Vector3(4, 1, 51);
+
 function animate() {
     requestAnimationFrame(animate);
     physicsWorld.step(1 / 60);
@@ -210,23 +198,34 @@ function animate() {
     if (ball) {
         ball.position.copy(ballBody.position);
         ball.quaternion.copy(ballBody.quaternion);
+
+        // Check if the ball has reached the end of the maze
+        if (ball.position.distanceTo(targetPosition) < 2) {
+            showGameCompleted();
+        }
     }
 
-    // orbitControls.update();
     renderer.render(scene, camera);
 }
 
-// Update movement logic for the ball
+// Show "Game Completed" when the ball reaches the end
+function showGameCompleted() {
+    const gameCompletedDiv = document.getElementById('gameCompleted');
+    gameCompletedDiv.style.display = 'block';
+    ballBody.velocity.set(0, 0, 0);
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+}
+
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
     const moveBackward = keys.ArrowDown || keys.s;
     const moveLeft = keys.ArrowLeft || keys.a;
     const moveRight = keys.ArrowRight || keys.d;
 
-    const acceleration = 20 * (1 / 60); // Acceleration per frame
-    const maxSpeed = 10; // Maximum speed
+    const acceleration = 20 * (1 / 60);
+    const maxSpeed = 10;
 
-    // Apply forces based on key presses
     if (moveForward) {
         ballBody.velocity.z -= acceleration;
     }
@@ -240,7 +239,6 @@ function updateMovement() {
         ballBody.velocity.x += acceleration;
     }
 
-    // Limit horizontal speed
     const horizontalVelocity = new CANNON.Vec3(ballBody.velocity.x, 0, ballBody.velocity.z);
     if (horizontalVelocity.length() > maxSpeed) {
         horizontalVelocity.normalize();
@@ -249,7 +247,6 @@ function updateMovement() {
         ballBody.velocity.z = horizontalVelocity.z;
     }
 
-    // Jumping
     const isOnGround = Math.abs(ballBody.position.y - 1) < 0.1 && ballBody.velocity.y <= 0.01;
     if (keys[' '] && isOnGround) {
         ballBody.velocity.y = 10;
@@ -257,17 +254,20 @@ function updateMovement() {
 }
 
 function setupControls() {
-    window.addEventListener('keydown', (event) => {
-        if (keys.hasOwnProperty(event.key)) {
-            keys[event.key] = true;
-        }
-    });
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+}
 
-    window.addEventListener('keyup', (event) => {
-        if (keys.hasOwnProperty(event.key)) {
-            keys[event.key] = false;
-        }
-    });
+function handleKeyDown(event) {
+    if (keys.hasOwnProperty(event.key)) {
+        keys[event.key] = true;
+    }
+}
+
+function handleKeyUp(event) {
+    if (keys.hasOwnProperty(event.key)) {
+        keys[event.key] = false;
+    }
 }
 
 initGame();
