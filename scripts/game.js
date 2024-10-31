@@ -19,6 +19,7 @@ let wallSlideSpeed = 0.1;
 let hiddenWallBody;
 let collectibles = [];
 let collectedCount = 0; // Track collected items
+let textureLoader
 
 const keys = {
     ArrowUp: false,
@@ -43,7 +44,7 @@ function initGame() {
     createFloor();
     createMaze(wallsData);
     createBall();
-    loadGoal();
+    loadModel();
     setupControls();
     // setupPointerLock(); 
     setupLights();
@@ -56,6 +57,8 @@ function initGame() {
 function initScene() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    textureLoader = new THREE.TextureLoader(); // Initialize texture loader
+
 
     // Set initial camera position and rotation
     camera.position.set(0, 80, 0);
@@ -90,8 +93,25 @@ function initPhysics() {
 
 function createFloor() {
     const floorSize = 150;
+    
+    // Load textures
+    const colorTexture = textureLoader.load('./textures/Sci-Fi_Wall_014_SD/Sci-Fi_Wall_014_basecolor.jpg');
+    const normalTexture = textureLoader.load('./textures/Sci-Fi_Wall_014_SD/Sci-Fi_Wall_014_normal.jpg');
+    const roughnessTexture = textureLoader.load('./textures/Sci-Fi_Wall_014_SD/Sci-Fi_Wall_014_roughness.jpg');
+
+    // Set texture properties
+    [colorTexture, normalTexture, roughnessTexture].forEach(texture => {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        // Set how many times the texture repeats across the floor
+        texture.repeat.set(20, 20);
+        // Enable anisotropic filtering for better quality at angles
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    });
+
     const floorMaterial = new THREE.MeshStandardMaterial({
-        color: "cyan",
+        map: colorTexture,
+        normalMap: normalTexture,
+        roughnessMap: roughnessTexture,
         side: THREE.DoubleSide,
         roughness: 0.8,
         metalness: 0.2
@@ -104,9 +124,7 @@ function createFloor() {
     floorMesh.castShadow = true;
     scene.add(floorMesh);
 
-    // const gridHelper = new THREE.GridHelper(100, 100);
-    // scene.add(gridHelper);
-
+    // Physics remains the same
     const floorShape = new CANNON.Plane();
     const floorBody = new CANNON.Body({ mass: 0 });
     floorBody.addShape(floorShape);
@@ -120,26 +138,88 @@ function createWall(x, z, length, height, isAlignedWithZ) {
     const scaledLength = length * scaleFactor;
     const scaledHeight = height * scaleFactor;
 
-    const wallMaterial = new THREE.MeshStandardMaterial({
-        color: "cyan",
-        roughness: 0.7,
-        metalness: 0.3,
-        side: THREE.DoubleSide,
-        transparent: false, // Ensure walls are not transparent
-        opacity: 1.0
+    // Load textures
+    const colorTexture = textureLoader.load('./textures/Sci_fi_Metal_Panel_007_SD/Sci_fi_Metal_Panel_007_basecolor.png');  // Replace with your texture path
+    const normalTexture = textureLoader.load('./textures/Sci_fi_Metal_Panel_007_SD/Sci_fi_Metal_Panel_007_normal.png'); // Replace with your normal map
+    const roughnessTexture = textureLoader.load('./textures/Sci_fi_Metal_Panel_007_SD/Sci_fi_Metal_Panel_007_roughness.png'); // Replace with your roughness map
+    
+
+    // Set texture properties
+    [colorTexture, normalTexture, roughnessTexture].forEach(texture => {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        // Enable anisotropic filtering for better quality at angles
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
     });
 
+    // Calculate texture repeat based on real-world size
+    // Assuming you want the texture to repeat every 2 units
+    const textureScale = 2; // Adjust this value to change texture size
+    let repeatX, repeatZ;
+
+    if (isAlignedWithZ) {
+        // For Z-aligned walls
+        repeatX = wallThickness / textureScale;
+        repeatZ = scaledLength / textureScale;
+    } else {
+        // For X-aligned walls
+        repeatX = scaledLength / textureScale;
+        repeatZ = wallThickness / textureScale;
+    }
+
+    const repeatY = scaledHeight / textureScale;
+
+    const wallMaterial = new THREE.MeshStandardMaterial({
+        map: colorTexture,
+        normalMap: normalTexture,
+        roughnessMap: roughnessTexture,
+        roughness: 0.7,
+        metalness: 0.3,
+        side: THREE.DoubleSide
+    });
+
+    // Create geometry with custom UV mapping
     const wallGeometry = new THREE.BoxGeometry(
         isAlignedWithZ ? wallThickness : scaledLength,
         scaledHeight,
         isAlignedWithZ ? scaledLength : wallThickness
     );
+
+    // Modify UV coordinates for each face
+    const uvAttribute = wallGeometry.attributes.uv;
+    const positions = wallGeometry.attributes.position;
+    
+    for (let i = 0; i < uvAttribute.count; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        
+        let u = 0, v = 0;
+        
+        // Determine which face we're on and set UVs accordingly
+        if (Math.abs(positions.getZ(i)) === wallThickness/2) {
+            // Front/Back faces
+            u = (x / (isAlignedWithZ ? wallThickness : scaledLength)) * repeatX;
+            v = (y / scaledHeight) * repeatY;
+        } else if (Math.abs(positions.getX(i)) === (isAlignedWithZ ? wallThickness : scaledLength)/2) {
+            // Left/Right faces
+            u = (z / (isAlignedWithZ ? scaledLength : wallThickness)) * repeatZ;
+            v = (y / scaledHeight) * repeatY;
+        } else {
+            // Top/Bottom faces
+            u = (x / (isAlignedWithZ ? wallThickness : scaledLength)) * repeatX;
+            v = (z / (isAlignedWithZ ? scaledLength : wallThickness)) * repeatZ;
+        }
+        
+        uvAttribute.setXY(i, u, v);
+    }
+
     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
     wallMesh.position.set(scaledX, scaledHeight / 2, scaledZ);
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
     scene.add(wallMesh);
 
+    // Physics body creation remains the same
     const wallShape = new CANNON.Box(new CANNON.Vec3(
         isAlignedWithZ ? wallThickness / 2 : scaledLength / 2,
         scaledHeight / 2,
@@ -151,7 +231,8 @@ function createWall(x, z, length, height, isAlignedWithZ) {
     physicsWorld.addBody(wallBody);
 
     walls.push({ mesh: wallMesh, body: wallBody });
-}
+}    // Load textures
+
 
 function createMaze(wallsData) {
     for (const wall of wallsData) {
@@ -221,22 +302,21 @@ function updateCollectibleCounter() {
 
 
 function addCollectibles() {
-    // createCollectible(5, -4);
-    // createCollectible(46,30);
-    // createCollectible(36, 12);
-    // createCollectible(29,38);
-    // createCollectible(-5,29);
-    // createCollectible(-12,-12);
-    // createCollectible(-29,-45.5);
-    // createCollectible(46,47);
-    // createCollectible(-4,4);
-    // createCollectible(-29,12);
-    // createCollectible(-37,-21);
-    // createCollectible(-4,-20);    // Add as many collectibles as needed at specific positions
-
+    createCollectible(5, -4);
+    createCollectible(46,30);
+    createCollectible(36, 12);
+    createCollectible(29,38);
+    createCollectible(-5,29);
+    createCollectible(-12,-12);
+    createCollectible(-29,-45.5);
+    createCollectible(46,47);
+    createCollectible(-4,4);
+    createCollectible(-29,12);
+    createCollectible(-37,-21);
+    createCollectible(-4,-20);    
     //Test Collectible
 
-    createCollectible(5,45);
+    //createCollectible(5,45);
 
 }
 
@@ -354,16 +434,46 @@ function createBall() {
     // scene.add(lightHelper);
 }
 
-function loadGoal() {
+function loadModel() {
     const loader = new GLTFLoader();
     loader.load(
-        './models/soccerGoal.glb',
+        './models/symmetrical_abstract_ball.glb',
         function (gltf) {
             console.log('Goal model loaded successfully:', gltf);
             soccerGoal = gltf.scene;
-            soccerGoal.scale.set(5, 5, 5);
-            soccerGoal.position.set(-10, 2, -65);
+            soccerGoal.scale.set(0.1, 0.1, 0.1);
+            soccerGoal.position.set(-10, 1, -65);
+
+            // Create a new material with emissive properties
+            const modelMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                emissive: 0xff0000, // Set the emissive color to red
+                emissiveIntensity: 1.0, // Adjust the emissive intensity
+                roughness: 0.4,
+                metalness: 0.8
+            });
+
+            // Apply the new material to the model
+            soccerGoal.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.material = modelMaterial;
+                }
+            });
+
+            // Add a point light to the model
+            const modelLight = new THREE.PointLight(0xff0000, 1, 10);
+            modelLight.position.set(0, 0, 0);
+            soccerGoal.add(modelLight);
+
+            // Add the model to the scene
             scene.add(soccerGoal);
+
+            // Add physics body for the model
+            const modelShape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+            const modelBody = new CANNON.Body({ mass: 0 });
+            modelBody.addShape(modelShape);
+            modelBody.position.copy(soccerGoal.position);
+            physicsWorld.addBody(modelBody);
         },
         undefined,
         function (error) {
@@ -371,6 +481,7 @@ function loadGoal() {
         }
     );
 }
+
 
 function setupLights() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
