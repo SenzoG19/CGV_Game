@@ -13,13 +13,16 @@ let walls = [];
 let orbitControls;
 let requiredCollectibles;
 let hiddenWall, buttonBody, buttonMesh;
-let isWallVisible = false;
 let wallSlideTimeout;
 let wallSlideSpeed = 0.1;
 let hiddenWallBody;
 let collectibles = [];
 let collectedCount = 0; // Track collected items
-let textureLoader
+let textureLoader;
+let nightSky;
+
+// Add target position for the end of the maze
+const targetPosition = new THREE.Vector3(4, 1, 55);
 
 const keys = {
     ArrowUp: false,
@@ -58,6 +61,14 @@ function initScene() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     textureLoader = new THREE.TextureLoader(); // Initialize texture loader
+    nightSky = createNightSky();
+
+    // Adjust scene background color
+    scene.background = new THREE.Color(0x000000);
+
+    // Adjust ambient light for night scene
+    const ambientLight = new THREE.AmbientLight(0x101020, 0.2);
+    scene.add(ambientLight);
 
 
     // Set initial camera position and rotation
@@ -93,7 +104,7 @@ function initPhysics() {
 
 function createFloor() {
     const floorSize = 150;
-    
+
     // Load textures
     const colorTexture = textureLoader.load('./textures/Sci-Fi_Wall_014_SD/Sci-Fi_Wall_014_basecolor.jpg');
     const normalTexture = textureLoader.load('./textures/Sci-Fi_Wall_014_SD/Sci-Fi_Wall_014_normal.jpg');
@@ -142,7 +153,7 @@ function createWall(x, z, length, height, isAlignedWithZ) {
     const colorTexture = textureLoader.load('./textures/Sci_fi_Metal_Panel_007_SD/Sci_fi_Metal_Panel_007_basecolor.png');  // Replace with your texture path
     const normalTexture = textureLoader.load('./textures/Sci_fi_Metal_Panel_007_SD/Sci_fi_Metal_Panel_007_normal.png'); // Replace with your normal map
     const roughnessTexture = textureLoader.load('./textures/Sci_fi_Metal_Panel_007_SD/Sci_fi_Metal_Panel_007_roughness.png'); // Replace with your roughness map
-    
+
 
     // Set texture properties
     [colorTexture, normalTexture, roughnessTexture].forEach(texture => {
@@ -187,20 +198,20 @@ function createWall(x, z, length, height, isAlignedWithZ) {
     // Modify UV coordinates for each face
     const uvAttribute = wallGeometry.attributes.uv;
     const positions = wallGeometry.attributes.position;
-    
+
     for (let i = 0; i < uvAttribute.count; i++) {
         const x = positions.getX(i);
         const y = positions.getY(i);
         const z = positions.getZ(i);
-        
+
         let u = 0, v = 0;
-        
+
         // Determine which face we're on and set UVs accordingly
-        if (Math.abs(positions.getZ(i)) === wallThickness/2) {
+        if (Math.abs(positions.getZ(i)) === wallThickness / 2) {
             // Front/Back faces
             u = (x / (isAlignedWithZ ? wallThickness : scaledLength)) * repeatX;
             v = (y / scaledHeight) * repeatY;
-        } else if (Math.abs(positions.getX(i)) === (isAlignedWithZ ? wallThickness : scaledLength)/2) {
+        } else if (Math.abs(positions.getX(i)) === (isAlignedWithZ ? wallThickness : scaledLength) / 2) {
             // Left/Right faces
             u = (z / (isAlignedWithZ ? scaledLength : wallThickness)) * repeatZ;
             v = (y / scaledHeight) * repeatY;
@@ -209,7 +220,7 @@ function createWall(x, z, length, height, isAlignedWithZ) {
             u = (x / (isAlignedWithZ ? wallThickness : scaledLength)) * repeatX;
             v = (z / (isAlignedWithZ ? scaledLength : wallThickness)) * repeatZ;
         }
-        
+
         uvAttribute.setXY(i, u, v);
     }
 
@@ -303,17 +314,17 @@ function updateCollectibleCounter() {
 
 function addCollectibles() {
     createCollectible(5, -4);
-    createCollectible(46,30);
+    createCollectible(46, 30);
     createCollectible(36, 12);
-    createCollectible(29,38);
-    createCollectible(-5,29);
-    createCollectible(-12,-12);
-    createCollectible(-29,-45.5);
-    createCollectible(46,47);
-    createCollectible(-4,4);
-    createCollectible(-29,12);
-    createCollectible(-37,-21);
-    createCollectible(-4,-20);    
+    createCollectible(29, 38);
+    createCollectible(-5, 29);
+    createCollectible(-12, -12);
+    createCollectible(-29, -45.5);
+    createCollectible(46, 47);
+    createCollectible(-4, 4);
+    createCollectible(-29, 12);
+    createCollectible(-37, -21);
+    createCollectible(-4, -20);
     //Test Collectible
 
     //createCollectible(5,45);
@@ -389,9 +400,9 @@ function showWall() {
                 // Stop the sliding animation
                 clearInterval(wallSlideTimeout);
 
-                 // Disable the wall's physics body
-                 hiddenWallBody.sleep();
-                 hiddenWallBody.collisionResponse = false;
+                // Disable the wall's physics body
+                hiddenWallBody.sleep();
+                hiddenWallBody.collisionResponse = false;
             }
         }, 16); // 16 ms = ~60 FPS
 
@@ -412,9 +423,9 @@ function createBall() {
     ballBody.linearDamping = 0.5;
     physicsWorld.addBody(ballBody);
 
-    const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+    const geometry = new THREE.SphereGeometry(0.4, 32, 32);
     const material = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
+        color: "yellow",
         emissive: "yellow",
         emissiveIntensity: 1.5,
         roughness: 0.4,
@@ -439,41 +450,47 @@ function loadModel() {
     loader.load(
         './models/symmetrical_abstract_ball.glb',
         function (gltf) {
-            console.log('Goal model loaded successfully:', gltf);
+            console.log('Model loaded successfully:', gltf);
             soccerGoal = gltf.scene;
-            soccerGoal.scale.set(0.1, 0.1, 0.1);
-            soccerGoal.position.set(-10, 1, -65);
 
-            // Create a new material with emissive properties
+            // Scale the model to fit around the existing ball
+            // Adjust scale to match your ball size (0.5 radius * 2.5 for padding)
+            const modelScale = 0.025;
+            soccerGoal.scale.set(modelScale, modelScale, modelScale);
+
+            // Create a material that's slightly transparent to see the inner ball
             const modelMaterial = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-                emissive: 0xff0000, // Set the emissive color to red
-                emissiveIntensity: 1.0, // Adjust the emissive intensity
+                // color: 0xffffff,
+                // emissive: 0xff0000,
+                // emissiveIntensity: 0.5,
                 roughness: 0.4,
-                metalness: 0.8
+                metalness: 0.8,
+                transparent: true,
+                opacity: 1,    // Adjust for desired transparency
+                side: THREE.DoubleSide
             });
 
-            // Apply the new material to the model
+            // Apply the material to all mesh children
             soccerGoal.traverse((child) => {
                 if (child instanceof THREE.Mesh) {
                     child.material = modelMaterial;
+                    child.castShadow = true;
+                    child.receiveShadow = true;
                 }
             });
 
+            // Parent the model to the ball
+            ball.add(soccerGoal);
+
+            // Center the model on the ball
+            soccerGoal.position.set(0, -0.5, 0);
+
             // Add a point light to the model
-            const modelLight = new THREE.PointLight(0xff0000, 1, 10);
-            modelLight.position.set(0, 0, 0);
-            soccerGoal.add(modelLight);
+            // const modelLight = new THREE.PointLight(0xff0000, 1, 10);
+            // modelLight.position.set(0, 0, 0);
+            // soccerGoal.add(modelLight);
 
-            // Add the model to the scene
-            scene.add(soccerGoal);
-
-            // Add physics body for the model
-            const modelShape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-            const modelBody = new CANNON.Body({ mass: 0 });
-            modelBody.addShape(modelShape);
-            modelBody.position.copy(soccerGoal.position);
-            physicsWorld.addBody(modelBody);
+            // No need for physics body for the model since it will follow the ball
         },
         undefined,
         function (error) {
@@ -502,11 +519,123 @@ function setupLights() {
 // }
 
 
-// Add target position for the end of the maze
-const targetPosition = new THREE.Vector3(4, 1, 55);
+function createNightSky() {
+    // Create star field with improved point sprites
+    const starsGeometry = new THREE.BufferGeometry();
+    const starsCount = 2000;
+    const starsPositions = new Float32Array(starsCount * 3);
+    const starsSizes = new Float32Array(starsCount);
+    const starsColors = new Float32Array(starsCount * 3);
+
+    for (let i = 0; i < starsCount; i++) {
+        const i3 = i * 3;
+        // Create stars in a hemisphere above the scene
+        const radius = 300;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI * 0.5; // Only create stars in upper hemisphere
+
+        starsPositions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+        starsPositions[i3 + 1] = radius * Math.cos(phi);
+        starsPositions[i3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+
+        // Random size for each star
+        starsSizes[i] = Math.random() * 2 + 0.5;
+
+        // Random color variations
+        const colorTemp = Math.random();
+        starsColors[i3] = 1.0;     // R
+        starsColors[i3 + 1] = 0.8 + colorTemp * 0.2; // G
+        starsColors[i3 + 2] = 0.6 + colorTemp * 0.4; // B
+    }
+
+    starsGeometry.setAttribute('position', new THREE.BufferAttribute(starsPositions, 3));
+    starsGeometry.setAttribute('size', new THREE.BufferAttribute(starsSizes, 1));
+    starsGeometry.setAttribute('color', new THREE.BufferAttribute(starsColors, 3));
+
+    // Create simpler shader material for better performance
+    const starsMaterial = new THREE.PointsMaterial({
+        size: 1,
+        sizeAttenuation: true,
+        map: createStarSprite(),
+        alphaMap: createStarSprite(),
+        transparent: true,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
+
+    // Create darker gradient background
+    const skyGeometry = new THREE.SphereGeometry(350, 32, 32);
+    const skyMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        side: THREE.BackSide,
+        fog: false
+    });
+
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    scene.add(sky);
+
+    // Add a moon
+    const moonGeometry = new THREE.SphereGeometry(10, 32, 32);
+    const moonMaterial = new THREE.MeshBasicMaterial({
+        color: 0xFFFFFF,
+        emissive: 0xFFFFFF,
+        emissiveIntensity: 1,
+    });
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.position.set(200, 100, -200);
+    scene.add(moon);
+
+    // Add moon glow
+    const moonLight = new THREE.PointLight(0xFFFFFF, 2, 500);
+    moon.add(moonLight);
+
+    return {
+        updateStars: function(time) {
+            // Simple pulsing effect
+            stars.rotation.y = time * 0.00005;
+            const scale = 1 + Math.sin(time * 0.001) * 0.1;
+            starsMaterial.size = scale;
+        },
+        stars,
+        sky,
+        moon
+    };
+}
+
+// Helper function to create star texture
+function createStarSprite() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    
+    const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.4, 'rgba(255,255,255,0.8)');
+    gradient.addColorStop(0.8, 'rgba(255,255,255,0.2)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 32, 32);
+    
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
 
 function animate() {
     requestAnimationFrame(animate);
+
+    // Add this line to update stars
+    if (nightSky) {
+        nightSky.updateStars(performance.now());
+    }
+
     physicsWorld.step(1 / 60);
 
     showWall();
