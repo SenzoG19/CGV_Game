@@ -20,6 +20,15 @@ let collectibles = [];
 let collectedCount = 0; // Track collected items
 let textureLoader;
 let nightSky;
+let isAlive = true; // Track if the player is alive
+
+
+// Add these variables to your global variables section
+let movingPlatforms = [];
+let rotatingObstacles = [];
+let bouncePads = [];
+let speedBoosts = [];
+let teleporters = [];
 
 // Add target position for the end of the maze
 const targetPosition = new THREE.Vector3(4, 1, 55);
@@ -42,10 +51,12 @@ const scaleFactor = 1; // Scale factor for walls
 const raycaster = new THREE.Raycaster();
 
 function initGame() {
+    // loadGameOverScreen();
     initScene();
     initPhysics();
     createFloor();
     createMaze(wallsData);
+    initializeObstacles();
     createBall();
     loadModel();
     setupControls();
@@ -55,7 +66,18 @@ function initGame() {
     addCollectibles();
     updateCollectibleCounter();
     animate();
+
+
 }
+
+function initializeObstacles() {
+    createMovingPlatforms();
+    createRotatingObstacles();
+    createBouncePads();
+    createSpeedBoosts();
+    createTeleporters();
+}
+
 
 function initScene() {
     scene = new THREE.Scene();
@@ -99,7 +121,7 @@ function initScene() {
 
 function initPhysics() {
     physicsWorld = new CANNON.World();
-    physicsWorld.gravity.set(0, -9.82, 0);
+    physicsWorld.gravity.set(0, -30, 0);
 }
 
 function createFloor() {
@@ -416,11 +438,11 @@ function createBall() {
     const sphereShape = new CANNON.Sphere(0.5);
     ballBody = new CANNON.Body({
         mass: 1,
-        position: new CANNON.Vec3(5, 1, 35),
+        position: new CANNON.Vec3(45, 1, -45),
         shape: sphereShape,
         material: new CANNON.Material({ restitution: 0.6 })
     });
-    ballBody.linearDamping = 0.5;
+    ballBody.linearDamping = 0.9;
     physicsWorld.addBody(ballBody);
 
     const geometry = new THREE.SphereGeometry(0.4, 32, 32);
@@ -594,7 +616,7 @@ function createNightSky() {
     moon.add(moonLight);
 
     return {
-        updateStars: function(time) {
+        updateStars: function (time) {
             // Simple pulsing effect
             stars.rotation.y = time * 0.00005;
             const scale = 1 + Math.sin(time * 0.001) * 0.1;
@@ -612,20 +634,434 @@ function createStarSprite() {
     canvas.width = 32;
     canvas.height = 32;
     const ctx = canvas.getContext('2d');
-    
+
     const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
     gradient.addColorStop(0, 'rgba(255,255,255,1)');
     gradient.addColorStop(0.4, 'rgba(255,255,255,0.8)');
     gradient.addColorStop(0.8, 'rgba(255,255,255,0.2)');
     gradient.addColorStop(1, 'rgba(255,255,255,0)');
-    
+
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 32, 32);
-    
+
     const texture = new THREE.Texture(canvas);
     texture.needsUpdate = true;
     return texture;
 }
+
+
+//OBSTACLES
+
+
+function createMovingPlatform(startPos, endPos, speed = 0.02) {
+    const platformGeometry = new THREE.BoxGeometry(4, 0.5, 4);
+    const platformMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00ff00,
+        emissive: 0x00ff00,
+        emissiveIntensity: 0.5,
+        metalness: 0.8,
+        roughness: 0.2
+    });
+
+    const platformMesh = new THREE.Mesh(platformGeometry, platformMaterial);
+    platformMesh.position.copy(startPos);
+    platformMesh.castShadow = true;
+    platformMesh.receiveShadow = true;
+    scene.add(platformMesh);
+
+    const platformShape = new CANNON.Box(new CANNON.Vec3(2, 0.25, 2));
+    const platformBody = new CANNON.Body({
+        mass: 0,
+        position: new CANNON.Vec3(startPos.x, startPos.y, startPos.z),
+        material: new CANNON.Material({ friction: 0.5 })
+    });
+    platformBody.addShape(platformShape);
+    physicsWorld.addBody(platformBody);
+
+    // Add platform light
+    const platformLight = new THREE.PointLight(0x00ff00, 1, 5);
+    platformLight.position.set(0, 1, 0);
+    platformMesh.add(platformLight);
+
+    movingPlatforms.push({
+        mesh: platformMesh,
+        body: platformBody,
+        startPos: startPos.clone(),
+        endPos: endPos.clone(),
+        progress: 0,
+        speed: speed,
+        forward: true
+    });
+}
+
+function createRotatingObstacle(position, radius = 3, height = 7) {
+    const obstacleGeometry = new THREE.BoxGeometry(radius * 2, height, 0.5);
+    const obstacleMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff0000,
+        emissive: 0xff0000,
+        emissiveIntensity: 0.5,
+        metalness: 0.8,
+        roughness: 0.2
+    });
+
+    const obstacleMesh = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
+    obstacleMesh.position.copy(position);
+    obstacleMesh.castShadow = true;
+    obstacleMesh.receiveShadow = true;
+    scene.add(obstacleMesh);
+
+    const obstacleShape = new CANNON.Box(new CANNON.Vec3(radius, height / 2, 0.25));
+    const obstacleBody = new CANNON.Body({
+        mass: 0,
+        position: new CANNON.Vec3(position.x, position.y, position.z)
+    });
+    obstacleBody.addShape(obstacleShape);
+    physicsWorld.addBody(obstacleBody);
+
+    // Add warning light
+    const warningLight = new THREE.PointLight(0xff0000, 1, 5);
+    warningLight.position.set(0, 1, 0);
+    obstacleMesh.add(warningLight);
+
+    rotatingObstacles.push({
+        mesh: obstacleMesh,
+        body: obstacleBody,
+        speed: 0.02,
+        angle: 0
+    });
+
+    // Add collision event listener for this obstacle
+    obstacleBody.addEventListener("collide", (event) => {
+        if (event.body === ballBody) { // Check if the collision is with the ball
+            handleDeath();
+        }
+    });
+}
+
+function createBouncePad(position) {
+    const padGeometry = new THREE.CylinderGeometry(1, 1, 0.3, 32);
+    const padMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff00ff,
+        emissive: 0xff00ff,
+        emissiveIntensity: 0.5,
+        metalness: 0.8,
+        roughness: 0.2
+    });
+
+    const padMesh = new THREE.Mesh(padGeometry, padMaterial);
+    padMesh.position.copy(position);
+    padMesh.castShadow = true;
+    padMesh.receiveShadow = true;
+    scene.add(padMesh);
+
+    const padShape = new CANNON.Cylinder(1, 1, 0.3, 32);
+    const padBody = new CANNON.Body({
+        mass: 0,
+        position: new CANNON.Vec3(position.x, position.y, position.z),
+        material: new CANNON.Material({ restitution: 2.5 }) // High restitution for bounce
+    });
+    padBody.addShape(padShape);
+    physicsWorld.addBody(padBody);
+
+    // Add bounce effect light
+    const bounceLight = new THREE.PointLight(0xff00ff, 1, 5);
+    bounceLight.position.set(0, 1, 0);
+    padMesh.add(bounceLight);
+
+    bouncePads.push({
+        mesh: padMesh,
+        body: padBody
+    });
+}
+
+function createSpeedBoost(position, direction) {
+    const boostGeometry = new THREE.BoxGeometry(7, 0.1, 5);
+    const boostMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00ffff,
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.7
+    });
+
+    const boostMesh = new THREE.Mesh(boostGeometry, boostMaterial);
+    boostMesh.position.copy(position);
+    boostMesh.castShadow = true;
+    boostMesh.receiveShadow = true;
+    scene.add(boostMesh);
+
+    // Add speed boost effect light
+    const boostLight = new THREE.PointLight(0x00ffff, 1, 5);
+    boostLight.position.set(0, 1, 0);
+    boostMesh.add(boostLight);
+
+    speedBoosts.push({
+        mesh: boostMesh,
+        position: position.clone(),
+        direction: direction.normalize(),
+        boostForce: 1.5
+    });
+}
+
+function createTeleporter(position1, position2) {
+    const createTeleporterMesh = (position) => {
+        const teleporterGeometry = new THREE.TorusGeometry(1, 0.3, 16, 32);
+        const teleporterMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffff00,
+            emissive: 0xffff00,
+            emissiveIntensity: 0.5,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        const teleporterMesh = new THREE.Mesh(teleporterGeometry, teleporterMaterial);
+        teleporterMesh.position.copy(position);
+        teleporterMesh.rotation.x = Math.PI / 2;
+        teleporterMesh.castShadow = true;
+        teleporterMesh.receiveShadow = true;
+        scene.add(teleporterMesh);
+
+        // Add teleporter effect light
+        const teleporterLight = new THREE.PointLight(0xffff00, 1, 5);
+        teleporterLight.position.set(0, 0, 0);
+        teleporterMesh.add(teleporterLight);
+
+        return teleporterMesh;
+    };
+
+    const mesh1 = createTeleporterMesh(position1);
+    const mesh2 = createTeleporterMesh(position2);
+
+    teleporters.push({
+        entrance: {
+            mesh: mesh1,
+            position: position1.clone()
+        },
+        exit: {
+            mesh: mesh2,
+            position: position2.clone()
+        },
+        cooldown: false
+    });
+}
+
+// Add these obstacle placements to your game initialization
+function createMovingPlatforms() {
+    createMovingPlatform(
+        new THREE.Vector3(10, 1, 10),
+        new THREE.Vector3(10, 1, 20)
+    );
+    createMovingPlatform(
+        new THREE.Vector3(-15, 1, 25),
+        new THREE.Vector3(-25, 1, 25)
+    );
+}
+
+function createRotatingObstacles() {
+    createRotatingObstacle(new THREE.Vector3(46, 3, 20));
+    createRotatingObstacle(new THREE.Vector3(-15, 3, 29));
+}
+
+function createBouncePads() {
+    createBouncePad(new THREE.Vector3(15, 0.15, -15));
+    createBouncePad(new THREE.Vector3(-10, 0.15, -25));
+    // createBouncePad(new THREE.Vector3(-15, 0.15, -25));
+
+}
+
+function createSpeedBoosts() {
+    createSpeedBoost(
+        new THREE.Vector3(20, 0.05, 20),
+        new THREE.Vector3(1, 0, 0)
+    );
+    createSpeedBoost(
+        new THREE.Vector3(46, 0.05, -30),
+        new THREE.Vector3(0, 0, -1)
+    );
+}
+
+function createTeleporters() {
+    createTeleporter(
+        new THREE.Vector3(25, 1, 23),
+        new THREE.Vector3(-25, 1, -23)
+    );
+}
+
+
+function updateObstacles() {
+    // Update moving platforms
+    movingPlatforms.forEach(platform => {
+        if (platform.forward) {
+            platform.progress += platform.speed;
+            if (platform.progress >= 1) {
+                platform.forward = false;
+            }
+        } else {
+            platform.progress -= platform.speed;
+            if (platform.progress <= 0) {
+                platform.forward = true;
+            }
+        }
+
+        const newPosition = platform.startPos.clone().lerp(platform.endPos, platform.progress);
+        platform.mesh.position.copy(newPosition);
+        platform.body.position.copy(new CANNON.Vec3(newPosition.x, newPosition.y, newPosition.z));
+    });
+
+    // Update rotating obstacles
+    rotatingObstacles.forEach(obstacle => {
+        obstacle.angle += obstacle.speed;
+        obstacle.mesh.rotation.y = obstacle.angle;
+        const rotation = new CANNON.Quaternion();
+        rotation.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), obstacle.angle);
+        obstacle.body.quaternion.copy(rotation);
+    });
+
+    // Check for speed boost collisions
+    speedBoosts.forEach(boost => {
+        const distance = ball.position.distanceTo(boost.position);
+        if (distance < 2) {
+            const boostVelocity = boost.direction.multiplyScalar(boost.boostForce);
+            ballBody.velocity.x += boostVelocity.x;
+            ballBody.velocity.z += boostVelocity.z;
+        }
+    });
+
+    // Check for teleporter collisions
+    teleporters.forEach(teleporter => {
+        if (!teleporter.cooldown) {
+            const distanceToEntrance = ball.position.distanceTo(teleporter.entrance.position);
+            if (distanceToEntrance < 1.5) {
+                // Teleport the ball
+                ballBody.position.copy(new CANNON.Vec3(
+                    teleporter.exit.position.x,
+                    teleporter.exit.position.y + 1,
+                    teleporter.exit.position.z
+                ));
+                ballBody.velocity.setZero();
+
+                // Set cooldown
+                teleporter.cooldown = true;
+                setTimeout(() => {
+                    teleporter.cooldown = false;
+                }, 2000); // 2 second cooldown
+            }
+        }
+    });
+}
+
+function restartGame() {
+    isAlive = true; // Reset player state
+
+    // Reset collectibles
+    collectedCount = 0;
+    collectibles.forEach(collectible => {
+        collectible.collected = false;
+        collectible.mesh.visible = true; // Make collectibles visible again
+        physicsWorld.addBody(collectible.body); // Re-add bodies to the physics world
+    });
+    updateCollectibleCounter(); // Reset collectible counter display
+
+    // Recreate the ball and add it back to the scene
+    
+
+    createBall();
+    loadModel();
+
+    ballBody.velocity.set(0, 0, 0);
+    ballBody.angularVelocity.set(0, 0, 0);
+    ballBody.position.set(45, 1, -45);
+
+    // Hide the game-over screen
+    const gameOverDiv = document.getElementById('gameOver');
+    if (gameOverDiv) gameOverDiv.style.display = 'none';
+
+    // Re-enable controls
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    console.log("Game restarted");
+}
+
+
+function quitGame() {
+    // Create the toast message
+    const toast = document.createElement('div');
+    toast.textContent = "Quit button clicked!";
+    toast.style = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-size: 18px;
+        opacity: 1;
+        transition: opacity 0.5s ease;
+        z-index: 1000;
+    `;
+    document.body.appendChild(toast);
+
+    // Fade out and remove the toast after a short delay
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => document.body.removeChild(toast), 500);
+    }, 2000);
+}
+
+
+function loadGameOverScreen() {
+    fetch('./scripts/gameOverScreen.html')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            console.log("Game Over Screen HTML loaded successfully.");
+            document.body.insertAdjacentHTML('beforeend', html);
+
+            // Set display to block
+            document.getElementById('gameOver').style.display = 'block';
+
+            // Attach event listeners to buttons
+            document.getElementById('restartButton').addEventListener('click', restartGame);
+            document.getElementById('quitButton').addEventListener('click', quitGame);
+        })
+        .catch(error => console.error('Error loading game over screen:', error));
+}
+
+
+
+function handleDeath() {
+    if (!isAlive) return; // Prevent multiple triggers
+
+    isAlive = false;
+
+    // Remove the ball from the scene
+    if (ball) scene.remove(ball);
+
+    // Show the game-over screen
+    loadGameOverScreen();
+
+    // Stop the ball's movement and remove control listeners
+    ballBody.velocity.set(0, 0, 0);
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+
+    // Clear all key presses
+    for (let key in keys) {
+        keys[key] = false;
+    }
+
+    console.log("Player has died - ball removed, controls disabled, and keys cleared.");
+}
+
+
+// Set up the "Game Over" message HTML element only once
 
 
 function animate() {
@@ -640,9 +1076,12 @@ function animate() {
 
     showWall();
 
-    updateMovement();
-    // checkBallButtonCollision();
-    checkCollectibleCollisions();
+    if (isAlive) { // Only update if the player is alive
+        updateMovement();
+        checkCollectibleCollisions();
+    }
+
+    updateObstacles();
 
     if (ball) {
         ball.position.copy(ballBody.position);
@@ -776,8 +1215,8 @@ function updateMovement() {
     const moveLeft = keys.ArrowLeft || keys.a;
     const moveRight = keys.ArrowRight || keys.d;
 
-    const acceleration = 20 * (1 / 60);
-    const maxSpeed = 10;
+    const acceleration = 100 * (1 / 60);
+    const maxSpeed = 15; //Crank It up to 11
 
     // Get the camera's forward and right vectors
     const cameraDirection = new THREE.Vector3();
@@ -797,6 +1236,11 @@ function updateMovement() {
         moveDirection.x -= cameraDirection.x;
         moveDirection.z -= cameraDirection.z;
     }
+
+    const isOnGround = Math.abs(ballBody.position.y - 0.5) < 0.05;
+
+    // if (isOnGround) {
+    //     // Allow left/right controls
     if (moveLeft) {
         moveDirection.x += cameraRight.x;
         moveDirection.z += cameraRight.z;
@@ -805,6 +1249,11 @@ function updateMovement() {
         moveDirection.x -= cameraRight.x;
         moveDirection.z -= cameraRight.z;
     }
+    // } else {
+    //     // Disable left/right controls while in the air
+    //     moveLeft = false;
+    //     moveRight = false;
+    // }
 
     if (moveDirection.length() > 0) {
         moveDirection.normalize();  // Normalize direction to ensure uniform speed
@@ -822,9 +1271,8 @@ function updateMovement() {
     }
 
     // Jumping logic (unchanged)
-    const isOnGround = Math.abs(ballBody.position.y - 0.5) < 0.05;
     if (keys[' '] && isOnGround) {
-        ballBody.velocity.y = 10;  // Jump velocity
+        ballBody.velocity.y = 20;  // Jump velocity
     }
 }
 
