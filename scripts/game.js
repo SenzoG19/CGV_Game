@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { wallsData } from '/scripts/wallsData.js';
 
 // Global variables
-let scene, camera, renderer, physicsWorld;
+let scene, camera, orthoCamera, renderer, physicsWorld;
 let ball, ballBody;
 let soccerGoal;
 let firstPersonView = false;
@@ -51,7 +51,6 @@ const scaleFactor = 1; // Scale factor for walls
 const raycaster = new THREE.Raycaster();
 
 function initGame() {
-    // loadGameOverScreen();
     initScene();
     initPhysics();
     createFloor();
@@ -117,6 +116,34 @@ function initScene() {
     orbitControls = new OrbitControls(camera, renderer.domElement);
     orbitControls.target.set(0, 0, 0);
     orbitControls.update();
+
+
+    // Second camera: Orthographic PIP camera
+    orthoCamera = new THREE.OrthographicCamera(
+        window.innerWidth / -18, // Left
+        window.innerWidth / 18,  // Right
+        window.innerHeight / 18, // Top
+        window.innerHeight / -18, // Bottom
+        0.1,                      // Near
+        1000                      // Far
+    );
+    orthoCamera.position.set(0, 80, 0); // Position it above the maze
+    orthoCamera.lookAt(0, 0, 0);        // Look downwards
+
+    // Update orthographic camera frustum to be square
+    function updateOrthoCameraAspect() {
+        orthoCamera.left = -window.innerWidth / 20;
+        orthoCamera.right = window.innerWidth / 20;
+        orthoCamera.top = window.innerHeight / 20;
+        orthoCamera.bottom = -window.innerHeight / 20;
+        orthoCamera.updateProjectionMatrix();
+    }
+
+    // Call this function when window is resized to keep the PIP camera aligned
+    window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        updateOrthoCameraAspect();
+    });
 }
 
 function initPhysics() {
@@ -383,26 +410,9 @@ function createHiddenWall() {
     physicsWorld.addBody(hiddenWallBody);
 }
 
-function createButton() {
-    // Button properties
-    const buttonMaterial = new THREE.MeshStandardMaterial({ color: "red" });
-    const buttonGeometry = new THREE.BoxGeometry(2, 0.5, 2); // Button as a small box
-    buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    buttonMesh.position.set(-8, 0.25, -65); // Set the button’s position
-    buttonMesh.castShadow = true;
-    buttonMesh.receiveShadow = true;
-    scene.add(buttonMesh);
-
-    const buttonShape = new CANNON.Box(new CANNON.Vec3(1, 0.25, 1));
-    buttonBody = new CANNON.Body({ mass: 0 });
-    buttonBody.addShape(buttonShape);
-    buttonBody.position.copy(buttonMesh.position);
-    physicsWorld.addBody(buttonBody);
-}
 
 function addInteractiveElements() {
     createHiddenWall();
-    createButton();
 }
 
 function showWall() {
@@ -775,7 +785,7 @@ function createBouncePad(position) {
 }
 
 function createSpeedBoost(position, direction) {
-    const boostGeometry = new THREE.BoxGeometry(7, 0.1, 5);
+    const boostGeometry = new THREE.BoxGeometry(8, 0.1, 5);
     const boostMaterial = new THREE.MeshStandardMaterial({
         color: 0x00ffff,
         emissive: 0x00ffff,
@@ -871,12 +881,16 @@ function createBouncePads() {
 
 function createSpeedBoosts() {
     createSpeedBoost(
-        new THREE.Vector3(20, 0.05, 20),
-        new THREE.Vector3(1, 0, 0)
+        new THREE.Vector3(37.5, 0.05, -10),
+        new THREE.Vector3(-1, 0, 0)
     );
     createSpeedBoost(
-        new THREE.Vector3(46, 0.05, -30),
+        new THREE.Vector3(46, 0.05, -20),
         new THREE.Vector3(0, 0, -1)
+    );
+    createSpeedBoost(
+        new THREE.Vector3(4.5, 0.05, 35),
+        new THREE.Vector3(1, 0, 0)
     );
 }
 
@@ -963,7 +977,7 @@ function restartGame() {
     updateCollectibleCounter(); // Reset collectible counter display
 
     // Recreate the ball and add it back to the scene
-    
+
 
     createBall();
     loadModel();
@@ -1094,10 +1108,19 @@ function animate() {
         // updateCamera(); // Commented out camera update
     }
 
-
-
     orbitControls.update(); // Update the OrbitControls
+    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     renderer.render(scene, camera);
+
+    // Picture-in-picture (PIP) camera view in top-left corner
+    const pipWidth = window.innerWidth / 5;   // Width of PIP viewport
+    const pipHeight = window.innerHeight / 5; // Height of PIP viewport
+    renderer.setViewport(10, window.innerHeight - pipHeight - 10, pipWidth, pipHeight);
+    renderer.setScissor(10, window.innerHeight - pipHeight - 10, pipWidth, pipHeight);
+    renderer.setScissorTest(true);
+    renderer.render(scene, orthoCamera);
+    renderer.setScissorTest(false); // Turn off scissor test after rendering PIP
+
 }
 
 
