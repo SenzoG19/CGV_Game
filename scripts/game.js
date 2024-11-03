@@ -1206,6 +1206,7 @@ let cameraRotation = {
     yaw: 0,
     pitch: 0
 };
+﻿
 
 function updateCameraRotation(event) {
     const sensitivity = 0.002;
@@ -1220,13 +1221,14 @@ function updateCameraRotation(event) {
     cameraRotation.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.pitch));
 }
 ﻿
+
 function updateCamera() {
     if (!ball) return;
 ﻿
 
     if (firstPersonView) {
         // Position camera inside or slightly above the ball
-        camera.position.copy(ball.position).add(new THREE.Vector3(0, 1, 0));
+        camera.position.copy(ball.position).add(new THREE.Vector3(0, 0.5, 0.5));
 ﻿
 
         // Look in the direction of the current camera yaw and pitch
@@ -1272,7 +1274,11 @@ function updateCamera() {
         camera.rotateX(cameraRotation.pitch);
     }
 }
+﻿
 
+﻿
+
+﻿
 
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
@@ -1281,7 +1287,7 @@ function updateMovement() {
     const moveRight = keys.ArrowRight || keys.d;
 ﻿
 
-    const acceleration = 50 * (1 / 60);
+    const acceleration = 20 * (1 / 60);
     const maxSpeed = 15;
 ﻿
 
@@ -1339,6 +1345,7 @@ function updateMovement() {
         ballBody.velocity.y = 20;  // Jump velocity
     }
 }
+﻿
 
 function setupControls() {
     window.addEventListener('keydown', handleKeyDown);
