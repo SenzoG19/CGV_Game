@@ -543,10 +543,12 @@ function setupLights() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
     scene.add(ambientLight);
 
-    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    // directionalLight.position.set(0, 20, 0);
-    // // directionalLight.castShadow = true;
-    // scene.add(directionalLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(0, 20, 0);
+    // directionalLight.castShadow = true;
+    directionalLight.layers.set(0);
+    scene.add(directionalLight);
+
 }
 
 
@@ -686,7 +688,7 @@ function createMovingPlatform(startPos, endPos, speed = 0.02) {
     platformMesh.receiveShadow = true;
     scene.add(platformMesh);
 
-    const platformShape = new CANNON.Box(new CANNON.Vec3(2, 0.25, 2));
+    const platformShape = new CANNON.Box(new CANNON.Vec3(7, 0.25, 2));
     const platformBody = new CANNON.Body({
         mass: 0,
         position: new CANNON.Vec3(startPos.x, startPos.y, startPos.z),
@@ -790,7 +792,6 @@ function createBouncePad(position) {
         body: padBody
     });
 }
-
 function createSpeedBoost(position, direction) {
     const boostGeometry = new THREE.BoxGeometry(8, 0.1, 5);
     const boostMaterial = new THREE.MeshStandardMaterial({
