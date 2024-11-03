@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import * as CANNON from 'cannon-es';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { wallsData } from '/scripts/wallsData.js';
 
@@ -10,7 +10,7 @@ let ball, ballBody;
 let soccerGoal;
 let firstPersonView = false;
 let walls = [];
-let orbitControls;
+// let orbitControls;
 let requiredCollectibles;
 let hiddenWall, buttonBody, buttonMesh;
 let wallSlideTimeout;
@@ -45,9 +45,8 @@ const keys = {
     ' ': false,
 };
 
-const cellSize = 5;
 const wallThickness = 1.5;
-const scaleFactor = 1; // Scale factor for walls
+const scaleFactor = 1;
 const raycaster = new THREE.Raycaster();
 
 function initGame() {
@@ -59,7 +58,7 @@ function initGame() {
     createBall();
     loadModel();
     setupControls();
-    // setupPointerLock(); 
+    setupPointerLock(); 
     setupLights();
     addInteractiveElements();
     addCollectibles();
@@ -93,12 +92,15 @@ function initScene() {
 
 
     // Set initial camera position and rotation
-    camera.position.set(0, 80, 0);
-    camera.lookAt(0, 0, 0);
+    // camera.position.set(0, 80, 0);
+    // camera.lookAt(0, 0, 0);
 
-    // Set initial camera position and rotation
-    // camera.position.copy(cameraOffset);
-    // camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    //Set initial camera position and rotation
+    camera.position.copy(cameraOffset);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+    camera.layers.enable(1); // Enable layer 1 for collectibles
+
 
     const canvasContainer = document.getElementById('canvasContainer');
     renderer = new THREE.WebGLRenderer({
@@ -112,10 +114,10 @@ function initScene() {
     renderer.physicallyCorrectLights = true; // Enable physically correct lighting
     canvasContainer.appendChild(renderer.domElement);
 
-    // Add OrbitControls
-    orbitControls = new OrbitControls(camera, renderer.domElement);
-    orbitControls.target.set(0, 0, 0);
-    orbitControls.update();
+    // // Add OrbitControls
+    // orbitControls = new OrbitControls(camera, renderer.domElement);
+    // orbitControls.target.set(0, 0, 0);
+    // orbitControls.update();
 
 
     // Second camera: Orthographic PIP camera
@@ -129,6 +131,9 @@ function initScene() {
     );
     orthoCamera.position.set(0, 80, 0); // Position it above the maze
     orthoCamera.lookAt(0, 0, 0);        // Look downwards
+    orthoCamera.layers.enable(0); // Only render layer 0, ignoring layer 1 (collectibles)
+    orthoCamera.layers.disable(1); // Ensure layer 1 is disabled
+
 
     // Update orthographic camera frustum to be square
     function updateOrthoCameraAspect() {
@@ -144,6 +149,7 @@ function initScene() {
         renderer.setSize(window.innerWidth, window.innerHeight);
         updateOrthoCameraAspect();
     });
+
 }
 
 function initPhysics() {
@@ -314,6 +320,7 @@ function createCollectible(x, z) {
     const collectibleMesh = new THREE.Mesh(collectibleGeometry, collectibleMaterial);
     collectibleMesh.position.set(x, 0.5, z);
     collectibleMesh.castShadow = true;
+    collectibleMesh.layers.set(1); // Set to layer 1 for main camera only
     scene.add(collectibleMesh);
 
     const collectibleShape = new CANNON.Sphere(0.3);
@@ -329,7 +336,7 @@ function createCollectible(x, z) {
     collectibleLight.shadow.mapSize.height = 512;
     collectibleLight.shadow.camera.near = 0.1;
     collectibleLight.shadow.camera.far = 10; // Reduced far plane to prevent light bleeding
-
+    collectibleLight.layers.set(1);
 
     collectibles.push({ mesh: collectibleMesh, body: collectibleBody, collected: false });
     requiredCollectibles = collectibles.length; // Set the required amount
@@ -448,9 +455,9 @@ function createBall() {
     const sphereShape = new CANNON.Sphere(0.5);
     ballBody = new CANNON.Body({
         mass: 1,
-        position: new CANNON.Vec3(45, 1, -45),
+        position: new CANNON.Vec3(0, 1, -65),
         shape: sphereShape,
-        material: new CANNON.Material({ restitution: 0.6 })
+        material: new CANNON.Material({ restitution: 0.6})
     });
     ballBody.linearDamping = 0.9;
     physicsWorld.addBody(ballBody);
@@ -536,10 +543,10 @@ function setupLights() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(0, 20, 0);
-    // directionalLight.castShadow = true;
-    scene.add(directionalLight);
+    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    // directionalLight.position.set(0, 20, 0);
+    // // directionalLight.castShadow = true;
+    // scene.add(directionalLight);
 }
 
 
@@ -664,7 +671,7 @@ function createStarSprite() {
 
 
 function createMovingPlatform(startPos, endPos, speed = 0.02) {
-    const platformGeometry = new THREE.BoxGeometry(4, 0.5, 4);
+    const platformGeometry = new THREE.BoxGeometry(7, 3, 1);
     const platformMaterial = new THREE.MeshStandardMaterial({
         color: 0x00ff00,
         emissive: 0x00ff00,
@@ -764,11 +771,11 @@ function createBouncePad(position) {
     padMesh.receiveShadow = true;
     scene.add(padMesh);
 
-    const padShape = new CANNON.Cylinder(1, 1, 0.3, 32);
+    const padShape = new CANNON.Cylinder(1.2, 1.2, 0.3, 32);
     const padBody = new CANNON.Body({
         mass: 0,
         position: new CANNON.Vec3(position.x, position.y, position.z),
-        material: new CANNON.Material({ restitution: 2.5 }) // High restitution for bounce
+        material: new CANNON.Material({ restitution: 10 }) // High restitution for bounce
     });
     padBody.addShape(padShape);
     physicsWorld.addBody(padBody);
@@ -858,25 +865,37 @@ function createTeleporter(position1, position2) {
 // Add these obstacle placements to your game initialization
 function createMovingPlatforms() {
     createMovingPlatform(
-        new THREE.Vector3(10, 1, 10),
-        new THREE.Vector3(10, 1, 20)
+        new THREE.Vector3(29, 1, -25),
+        new THREE.Vector3(29, 1, -17)
     );
     createMovingPlatform(
-        new THREE.Vector3(-15, 1, 25),
-        new THREE.Vector3(-25, 1, 25)
+        new THREE.Vector3(21.5, 1, 24),
+        new THREE.Vector3(21.5, 1, 8.5)
+    );
+    createMovingPlatform(
+        new THREE.Vector3(-45.5, 1, 25),
+        new THREE.Vector3(-45.5, 1, 16)
+    );
+    createMovingPlatform(
+        new THREE.Vector3(-45.5, 1, 25),
+        new THREE.Vector3(-45.5, 1, 16)
+    );
+    createMovingPlatform(
+        new THREE.Vector3(-45.5, 1, -17),
+        new THREE.Vector3(-45.5, 1, -8)
     );
 }
 
 function createRotatingObstacles() {
     createRotatingObstacle(new THREE.Vector3(46, 3, 20));
     createRotatingObstacle(new THREE.Vector3(-15, 3, 29));
+    createRotatingObstacle(new THREE.Vector3(-22, 3, -12.5));
 }
 
 function createBouncePads() {
-    createBouncePad(new THREE.Vector3(15, 0.15, -15));
-    createBouncePad(new THREE.Vector3(-10, 0.15, -25));
-    // createBouncePad(new THREE.Vector3(-15, 0.15, -25));
-
+    createBouncePad(new THREE.Vector3(10, 0.15, -15));
+    createBouncePad(new THREE.Vector3(-10, 0.15, -19));
+    createBouncePad(new THREE.Vector3(-2, 0.15, 48));
 }
 
 function createSpeedBoosts() {
@@ -892,12 +911,24 @@ function createSpeedBoosts() {
         new THREE.Vector3(4.5, 0.05, 35),
         new THREE.Vector3(1, 0, 0)
     );
+    createSpeedBoost(
+        new THREE.Vector3(-20.5, 0.05, 11),
+        new THREE.Vector3(1, 0, 0)
+    );
 }
 
 function createTeleporters() {
     createTeleporter(
-        new THREE.Vector3(25, 1, 23),
-        new THREE.Vector3(-25, 1, -23)
+        new THREE.Vector3(30, 1, -47),
+        new THREE.Vector3(-47, 1, -47)
+    );
+    createTeleporter(
+        new THREE.Vector3(30, 1, -4),
+        new THREE.Vector3(-47, 1, 47)
+    );
+    createTeleporter(
+        new THREE.Vector3(14, 1, 12),
+        new THREE.Vector3(-12, 1, 14)
     );
 }
 
@@ -1105,12 +1136,14 @@ function animate() {
             showGameCompleted();
         }
 
-        // updateCamera(); // Commented out camera update
+        updateCamera(); // Commented out camera update
     }
 
-    orbitControls.update(); // Update the OrbitControls
+    // orbitControls.update(); // Update the OrbitControls
     renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
     renderer.render(scene, camera);
+
+    
 
     // Picture-in-picture (PIP) camera view in top-left corner
     const pipWidth = window.innerWidth / 5;   // Width of PIP viewport
@@ -1175,21 +1208,25 @@ let cameraRotation = {
 
 function updateCameraRotation(event) {
     const sensitivity = 0.002;
+﻿
 
     // Update rotation angles
     cameraRotation.yaw -= event.movementX * sensitivity;
     cameraRotation.pitch -= event.movementY * sensitivity;
+﻿
 
     // Clamp the pitch to avoid camera flipping
     cameraRotation.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.pitch));
 }
-
+﻿
 function updateCamera() {
     if (!ball) return;
+﻿
 
     if (firstPersonView) {
         // Position camera inside or slightly above the ball
-        camera.position.copy(ball.position).add(new THREE.Vector3(0, 0.5, 0));
+        camera.position.copy(ball.position).add(new THREE.Vector3(0, 1, 0));
+﻿
 
         // Look in the direction of the current camera yaw and pitch
         const lookDirection = new THREE.Vector3(
@@ -1207,23 +1244,28 @@ function updateCamera() {
             Math.cos(cameraRotation.yaw) * cameraOffset.z
         );
         const targetPosition = ball.position.clone().add(rotatedOffset);
+﻿
 
         // Set raycaster from the ball position towards the new camera position
         const directionToCamera = new THREE.Vector3().subVectors(targetPosition, ball.position).normalize();
         raycaster.set(ball.position, directionToCamera);
+﻿
 
         // Check if any walls are in the path
         const intersects = raycaster.intersectObjects(walls.map(wall => wall.mesh));
         const collisionDistance = 1; // Define minimum distance from wall
+﻿
 
         // If no intersections or the closest one is beyond collisionDistance, move the camera
         if (intersects.length === 0 || intersects[0].distance > collisionDistance) {
             camera.position.lerp(targetPosition, 0.1);
         }
+﻿
 
         // Create a look target slightly above the ball
         const lookTarget = ball.position.clone().add(new THREE.Vector3(0, 2, 0));
         camera.lookAt(lookTarget);
+﻿
 
         // Apply pitch rotation
         camera.rotateX(cameraRotation.pitch);
@@ -1231,25 +1273,29 @@ function updateCamera() {
 }
 
 
-
 function updateMovement() {
     const moveForward = keys.ArrowUp || keys.w;
     const moveBackward = keys.ArrowDown || keys.s;
     const moveLeft = keys.ArrowLeft || keys.a;
     const moveRight = keys.ArrowRight || keys.d;
+﻿
 
-    const acceleration = 100 * (1 / 60);
-    const maxSpeed = 15; //Crank It up to 11
+    const acceleration = 50 * (1 / 60);
+    const maxSpeed = 15;
+﻿
 
     // Get the camera's forward and right vectors
     const cameraDirection = new THREE.Vector3();
     camera.getWorldDirection(cameraDirection);  // Forward direction of the camera
+﻿
 
     const cameraRight = new THREE.Vector3();
     cameraRight.crossVectors(camera.up, cameraDirection).normalize();  // Right direction
+﻿
 
     // Compute the direction of movement relative to the camera
     let moveDirection = new CANNON.Vec3();
+﻿
 
     if (moveForward) {
         moveDirection.x += cameraDirection.x;
@@ -1259,11 +1305,6 @@ function updateMovement() {
         moveDirection.x -= cameraDirection.x;
         moveDirection.z -= cameraDirection.z;
     }
-
-    const isOnGround = Math.abs(ballBody.position.y - 0.5) < 0.05;
-
-    // if (isOnGround) {
-    //     // Allow left/right controls
     if (moveLeft) {
         moveDirection.x += cameraRight.x;
         moveDirection.z += cameraRight.z;
@@ -1272,17 +1313,14 @@ function updateMovement() {
         moveDirection.x -= cameraRight.x;
         moveDirection.z -= cameraRight.z;
     }
-    // } else {
-    //     // Disable left/right controls while in the air
-    //     moveLeft = false;
-    //     moveRight = false;
-    // }
+﻿
 
     if (moveDirection.length() > 0) {
         moveDirection.normalize();  // Normalize direction to ensure uniform speed
         ballBody.velocity.x += moveDirection.x * acceleration;
         ballBody.velocity.z += moveDirection.z * acceleration;
     }
+﻿
 
     // Apply maximum speed clamp
     const horizontalVelocity = new CANNON.Vec3(ballBody.velocity.x, 0, ballBody.velocity.z);
@@ -1292,14 +1330,14 @@ function updateMovement() {
         ballBody.velocity.x = horizontalVelocity.x;
         ballBody.velocity.z = horizontalVelocity.z;
     }
+﻿
 
     // Jumping logic (unchanged)
+    const isOnGround = Math.abs(ballBody.position.y - 0.5) < 0.05;
     if (keys[' '] && isOnGround) {
         ballBody.velocity.y = 20;  // Jump velocity
     }
 }
-
-
 
 function setupControls() {
     window.addEventListener('keydown', handleKeyDown);
